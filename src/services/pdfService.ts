@@ -301,17 +301,25 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
             <div class="meta-section">
               <div class="site-column">
                 <div class="column-title">
-                  <span class="site-title-underline">SITE / PROJECT LOCATION</span>
+                  <span class="site-title-underline">BILLED TO (CLIENT)</span>
                 </div>
-                <div class="site-name">${bill.siteLocation || bill.customerName}</div>
-                <div class="site-address">
-                  ${bill.siteCity || 'Pune, Maharashtra'}
+                <!-- Client Name in BOLD -->
+                <div style="font-size: 16px; font-weight: 800; color: #0F172A; text-transform: uppercase; margin-bottom: 2px;">
+                  ${bill.customerName}
                 </div>
                 ${
                   bill.customerPhone
-                    ? `<div style="font-size: 12px; color: #64748B; margin-top: 4px;">Contact: ${bill.customerPhone}</div>`
+                    ? `<div style="font-size: 12px; color: #475569; margin-bottom: 6px;">Phone: ${bill.customerPhone}</div>`
                     : ''
                 }
+                <!-- Below client name, site name on the right side -->
+                <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px dashed #CBD5E1;">
+                  <span style="font-size: 11px; font-weight: 700; color: #7C1034; text-transform: uppercase;">Site / Project:</span>
+                  <div style="text-align: right;">
+                    <span style="font-size: 13px; font-weight: 700; color: #0F172A;">${bill.siteLocation || '—'}</span>
+                    ${bill.siteCity ? `<div style="font-size: 11px; color: #64748B;">${bill.siteCity}</div>` : ''}
+                  </div>
+                </div>
               </div>
 
               <div class="details-column">

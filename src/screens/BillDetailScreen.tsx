@@ -167,16 +167,27 @@ export const BillDetailScreen: React.FC = () => {
 
           {/* Two-Column Site / Invoice Details */}
           <View style={styles.metaRow}>
-            {/* Left: Site / Project Location */}
+            {/* Left: Client & Site Location */}
             <View style={styles.siteColumn}>
               <View style={styles.metaHeadingUnderline}>
-                <Text style={styles.metaHeadingText}>SITE / PROJECT LOCATION</Text>
+                <Text style={styles.metaHeadingText}>BILLED TO (CLIENT)</Text>
               </View>
-              <Text style={styles.siteNameText}>{bill.siteLocation || bill.customerName}</Text>
-              <Text style={styles.siteCityText}>{bill.siteCity || 'Pune, Maharashtra'}</Text>
+              {/* Client Name in BOLD */}
+              <Text style={styles.clientNameBold}>{bill.customerName}</Text>
               {bill.customerPhone ? (
-                <Text style={styles.clientPhoneText}>Contact: {bill.customerPhone}</Text>
+                <Text style={styles.clientPhoneText}>Phone: {bill.customerPhone}</Text>
               ) : null}
+
+              {/* Below client name, site name on the right side */}
+              <View style={styles.siteRowBelow}>
+                <Text style={styles.siteLabelSmall}>SITE / PROJECT:</Text>
+                <View style={styles.siteValueRight}>
+                  <Text style={styles.siteNameBelowText}>{bill.siteLocation || '—'}</Text>
+                  {bill.siteCity ? (
+                    <Text style={styles.siteCityBelowText}>{bill.siteCity}</Text>
+                  ) : null}
+                </View>
+              </View>
             </View>
 
             {/* Right: Invoice / Quotation Details */}
@@ -435,20 +446,49 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 4,
   },
-  siteNameText: {
-    fontSize: 13,
-    fontWeight: '800',
+  clientNameBold: {
+    fontSize: 15,
+    fontWeight: '900',
     color: COLORS.textPrimary,
+    textTransform: 'uppercase',
   },
-  siteCityText: {
+  clientPhoneText: {
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  clientPhoneText: {
+  siteRowBelow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  siteLabelSmall: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  siteValueRight: {
+    alignItems: 'flex-end',
+    flex: 1,
+    marginLeft: 6,
+  },
+  siteNameBelowText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    textAlign: 'right',
+  },
+  siteCityBelowText: {
     fontSize: 10,
-    color: COLORS.textMuted,
-    marginTop: 2,
+    color: COLORS.textSecondary,
+    textAlign: 'right',
+    marginTop: 1,
   },
   detailItemText: {
     fontSize: 11,

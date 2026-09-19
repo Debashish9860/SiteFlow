@@ -185,10 +185,18 @@ export const CreateBillScreen: React.FC = () => {
   const inWords = numberToWordsIndian(grandTotal);
 
   const handleSaveAndGenerate = async () => {
-    if (!siteLocation.trim() && !customerName.trim()) {
+    if (!customerName.trim()) {
       Alert.alert(
-        'Missing Site / Customer',
-        'Please enter Site / Project Location or Customer Name.'
+        'Missing Client Name',
+        'Please enter Customer / Client Name (to display in bold on the bill).'
+      );
+      return;
+    }
+
+    if (!siteLocation.trim()) {
+      Alert.alert(
+        'Missing Site Location',
+        'Please enter Site / Project Location (e.g. Nigdi Site).'
       );
       return;
     }
@@ -424,15 +432,25 @@ export const CreateBillScreen: React.FC = () => {
             {/* Site & Client Details */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <MaterialIcons name="location-on" size={20} color={COLORS.primary} />
-                <Text style={styles.cardTitle}>Site & Client Details</Text>
+                <MaterialIcons name="person-pin" size={20} color={COLORS.primary} />
+                <Text style={styles.cardTitle}>Client & Site Details</Text>
               </View>
+
+              <CustomInput
+                label="Customer / Client Name *"
+                placeholder="e.g. Mr. Kulkarni / Sunita Sharma"
+                value={customerName}
+                onChangeText={setCustomerName}
+                required
+                iconName="person"
+              />
 
               <CustomInput
                 label="Site / Project Location *"
                 placeholder="e.g. Nigdi Site, Flat 402, Green Acres"
                 value={siteLocation}
                 onChangeText={setSiteLocation}
+                required
                 iconName="home-work"
               />
 
@@ -447,11 +465,12 @@ export const CreateBillScreen: React.FC = () => {
               <View style={styles.rowInputs}>
                 <View style={{ flex: 1.2 }}>
                   <CustomInput
-                    label="Customer / Client Name"
-                    placeholder="e.g. Mr. Kulkarni"
-                    value={customerName}
-                    onChangeText={setCustomerName}
-                    iconName="person"
+                    label="Customer Phone"
+                    placeholder="e.g. 9876543210"
+                    value={customerPhone}
+                    onChangeText={setCustomerPhone}
+                    keyboardType="phone-pad"
+                    iconName="phone"
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -464,15 +483,6 @@ export const CreateBillScreen: React.FC = () => {
                   />
                 </View>
               </View>
-
-              <CustomInput
-                label="Customer Phone (for WhatsApp PDF)"
-                placeholder="e.g. 9876543210"
-                value={customerPhone}
-                onChangeText={setCustomerPhone}
-                keyboardType="phone-pad"
-                iconName="phone"
-              />
             </View>
 
             {/* SECTION: ADD PARTICULAR (Rate & Quantity) */}

@@ -256,15 +256,21 @@ export const HomeScreen: React.FC = () => {
                       <Text style={styles.billedByTag}>👤 {item.billedBy || 'Ramesh Raut'}</Text>
                     </View>
 
+                    {/* Client Name in BOLD */}
                     <Text style={styles.clientName}>
-                      {item.siteLocation || item.customerName}
+                      {item.customerName}
                     </Text>
-                    {item.siteLocation && item.customerName !== item.siteLocation ? (
-                      <Text style={styles.customerSubName}>Client: {item.customerName}</Text>
+                    {item.customerPhone ? (
+                      <Text style={styles.customerSubPhone}>📞 {item.customerPhone}</Text>
                     ) : null}
-                    {item.siteCity ? (
-                      <Text style={styles.siteText}>📍 {item.siteCity}</Text>
-                    ) : null}
+
+                    {/* Below client name, site name on the right side */}
+                    <View style={styles.siteRowRight}>
+                      <Text style={styles.siteLabelSmall}>Site:</Text>
+                      <Text style={styles.siteTextRight}>
+                        {item.siteLocation || '—'}{item.siteCity ? `, ${item.siteCity}` : ''}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={{ alignItems: 'flex-end' }}>
@@ -600,18 +606,32 @@ const styles = StyleSheet.create({
   },
   clientName: {
     fontSize: FONT_SIZES.md,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textPrimary,
   },
-  customerSubName: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  siteText: {
+  customerSubPhone: {
     fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  siteRowRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  siteLabelSmall: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+  },
+  siteTextRight: {
+    fontSize: 11,
+    fontWeight: '700',
     color: COLORS.textSecondary,
-    marginTop: 2,
+    textAlign: 'right',
   },
   billAmount: {
     fontSize: FONT_SIZES.md,
