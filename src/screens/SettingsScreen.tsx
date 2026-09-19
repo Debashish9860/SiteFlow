@@ -36,6 +36,7 @@ import {
 } from '../services/cloudSyncService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { SyncSuccessToast } from '../components/SyncSuccessToast';
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -59,6 +60,12 @@ export const SettingsScreen: React.FC = () => {
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [restoringCloud, setRestoringCloud] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
+
+  // Sync Success Toast State
+  const [showSyncToast, setShowSyncToast] = useState(false);
+  const [syncToastTitle, setSyncToastTitle] = useState('Data Sync Done!');
+  const [syncToastSubtitle, setSyncToastSubtitle] = useState('All bills & profile safely synced to MongoDB Atlas.');
+  const [syncToastCount, setSyncToastCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     loadProfile();
@@ -93,10 +100,10 @@ export const SettingsScreen: React.FC = () => {
     try {
       const result = await syncAllToCloud();
       if (result.success) {
-        Alert.alert(
-          'Cloud Backup Successful',
-          `✓ ${result.syncedCount} bills and profile safely synced to MongoDB Atlas Cluster0!`
-        );
+        setSyncToastTitle('Data Sync Done!');
+        setSyncToastSubtitle('All bills and company profile safely backed up to MongoDB Atlas Cluster0.');
+        setSyncToastCount(result.syncedCount);
+        setShowSyncToast(true);
         await loadCloudSyncState();
       } else {
         Alert.alert('Cloud Backup Notice', result.message || 'Could not connect to sync server.');
@@ -122,10 +129,10 @@ export const SettingsScreen: React.FC = () => {
             try {
               const res = await restoreAllFromCloud();
               if (res.success) {
-                Alert.alert(
-                  'Cloud Restore Complete',
-                  `✓ Successfully restored ${res.billsRestored} bills from MongoDB Atlas!`
-                );
+                setSyncToastTitle('Cloud Restore Done!');
+                setSyncToastSubtitle('All company bills & profile successfully recovered from MongoDB Atlas.');
+                setSyncToastCount(res.billsRestored);
+                setShowSyncToast(true);
                 await loadProfile();
                 await loadCloudSyncState();
               } else {
@@ -511,6 +518,15 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Animated Green Tick Mark Data Sync Toast */}
+      <SyncSuccessToast
+        visible={showSyncToast}
+        onClose={() => setShowSyncToast(false)}
+        title={syncToastTitle}
+        subtitle={syncToastSubtitle}
+        syncedCount={syncToastCount}
+      />
     </SafeAreaView>
   );
 };

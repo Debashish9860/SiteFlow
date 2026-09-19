@@ -33,6 +33,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
 import { useAuth } from '../context/AuthContext';
 import { RegisterPaymentModal } from '../components/RegisterPaymentModal';
+import { SyncSuccessToast } from '../components/SyncSuccessToast';
 
 // Animated Item Card for smooth staggered entrance
 const AnimatedBillCard: React.FC<{
@@ -181,6 +182,8 @@ export const HomeScreen: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'invoice' | 'quotation'>('all');
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<Bill | null>(null);
   const [syncingCloud, setSyncingCloud] = useState(false);
+  const [showSyncSuccess, setShowSyncSuccess] = useState(false);
+  const [syncCount, setSyncCount] = useState<number | undefined>(undefined);
 
   const handleQuickCloudSync = async () => {
     setSyncingCloud(true);
@@ -189,10 +192,8 @@ export const HomeScreen: React.FC = () => {
       if (res.success) {
         const refreshed = await getBills();
         setBills(refreshed);
-        Alert.alert(
-          'Cloud Synced ✓',
-          `All ${res.billsCount} bills synchronized across all team devices with MongoDB Atlas.`
-        );
+        setSyncCount(res.billsCount);
+        setShowSyncSuccess(true);
       } else {
         Alert.alert('Cloud Sync Notice', res.message);
       }
@@ -621,6 +622,15 @@ export const HomeScreen: React.FC = () => {
         onPaymentSuccess={() => {
           loadData();
         }}
+      />
+
+      {/* Animated Green Tick Mark Data Sync Toast */}
+      <SyncSuccessToast
+        visible={showSyncSuccess}
+        onClose={() => setShowSyncSuccess(false)}
+        title="Data Sync Done!"
+        subtitle="All bills & payments are synchronized with MongoDB Atlas."
+        syncedCount={syncCount}
       />
     </SafeAreaView>
   );
