@@ -9,6 +9,8 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +23,7 @@ import {
   ContractorPreset,
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
+import { syncAllToCloud, triggerBackgroundCloudSync } from '../services/cloudSyncService';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
@@ -173,6 +176,26 @@ export const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'invoice' | 'quotation'>('all');
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<Bill | null>(null);
+  const [syncingCloud, setSyncingCloud] = useState(false);
+
+  const handleQuickCloudSync = async () => {
+    setSyncingCloud(true);
+    try {
+      const res = await syncAllToCloud();
+      if (res.success) {
+        Alert.alert(
+          'Cloud Synced ✓',
+          `All ${res.syncedCount} bills & receipts safely backed up to MongoDB Atlas Cluster0.`
+        );
+      } else {
+        Alert.alert('Cloud Sync Notice', res.message);
+      }
+    } catch (e: any) {
+      Alert.alert('Sync Error', e?.message || 'Could not sync to cloud.');
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
 
   // Animation references
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -236,6 +259,7 @@ export const HomeScreen: React.FC = () => {
       if (loadedPresets && loadedPresets.length > 0) {
         setPresets(loadedPresets);
       }
+      triggerBackgroundCloudSync();
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -330,13 +354,28 @@ export const HomeScreen: React.FC = () => {
             </View>
           ) : null}
         </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Settings')}
-          style={styles.settingsBtn}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="settings" size={24} color="#FFF" />
-        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={handleQuickCloudSync}
+            style={styles.settingsBtn}
+            activeOpacity={0.8}
+            disabled={syncingCloud}
+          >
+            {syncingCloud ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <MaterialIcons name="cloud-sync" size={22} color="#FFF" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.settingsBtn}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="settings" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>

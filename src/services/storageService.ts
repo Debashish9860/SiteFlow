@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bill, BusinessProfile, PaymentRecord } from '../types/bill';
+import { triggerBackgroundCloudSync } from './cloudSyncService';
 
 const BILLS_KEY = '@billmaker_bills';
 const PROFILE_KEY = '@billmaker_profile';
@@ -49,6 +50,7 @@ export async function saveBill(newBill: Bill): Promise<void> {
       bills.unshift(newBill);
     }
     await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error saving bill:', error);
     throw error;
@@ -111,6 +113,7 @@ export async function registerBillPayment(
 
     bills[billIndex] = updatedBill;
     await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    triggerBackgroundCloudSync();
     return updatedBill;
   } catch (error) {
     console.error('Error registering bill payment:', error);
@@ -142,6 +145,7 @@ export async function updateBillPaymentStatus(
 
     bills[billIndex] = updatedBill;
     await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    triggerBackgroundCloudSync();
     return updatedBill;
   } catch (error) {
     console.error('Error updating bill payment status:', error);
@@ -154,6 +158,7 @@ export async function deleteBill(billId: string): Promise<void> {
     const bills = await getBills();
     const updated = bills.filter((b) => b.id !== billId);
     await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(updated));
+    triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error deleting bill:', error);
     throw error;
@@ -174,6 +179,7 @@ export async function getBusinessProfile(): Promise<BusinessProfile> {
 export async function saveBusinessProfile(profile: BusinessProfile): Promise<void> {
   try {
     await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error saving profile:', error);
     throw error;

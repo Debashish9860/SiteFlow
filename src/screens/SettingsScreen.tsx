@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
@@ -23,6 +25,15 @@ import {
   ContractorPreset,
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
+import {
+  checkCloudConnection,
+  syncAllToCloud,
+  restoreAllFromCloud,
+  getLastCloudSyncTime,
+  isAutoSyncEnabled,
+  setAutoSyncEnabled,
+  CloudStatusResult,
+} from '../services/cloudSyncService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,9 +53,99 @@ export const SettingsScreen: React.FC = () => {
   const [address, setAddress] = useState('Sus, Pune - 411021');
   const [noteFooter, setNoteFooter] = useState('Thank you for your business!');
 
+  // MongoDB Atlas Cloud Sync State
+  const [cloudStatus, setCloudStatus] = useState<CloudStatusResult>({ connected: false });
+  const [lastSyncText, setLastSyncText] = useState<string>('Never');
+  const [syncingCloud, setSyncingCloud] = useState(false);
+  const [restoringCloud, setRestoringCloud] = useState(false);
+  const [autoSync, setAutoSync] = useState(true);
+
   useEffect(() => {
     loadProfile();
+    loadCloudSyncState();
   }, []);
+
+  const loadCloudSyncState = async () => {
+    try {
+      const [status, lastTime, autoEnabled] = await Promise.all([
+        checkCloudConnection(),
+        getLastCloudSyncTime(),
+        isAutoSyncEnabled(),
+      ]);
+      setCloudStatus(status);
+      setAutoSync(autoEnabled);
+      if (lastTime) {
+        const d = new Date(lastTime);
+        setLastSyncText(
+          `${d.toLocaleDateString('en-IN')} at ${d.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`
+        );
+      }
+    } catch (e) {
+      console.warn('Error loading cloud status:', e);
+    }
+  };
+
+  const handleBackupToCloud = async () => {
+    setSyncingCloud(true);
+    try {
+      const result = await syncAllToCloud();
+      if (result.success) {
+        Alert.alert(
+          'Cloud Backup Successful',
+          `✓ ${result.syncedCount} bills and profile safely synced to MongoDB Atlas Cluster0!`
+        );
+        await loadCloudSyncState();
+      } else {
+        Alert.alert('Cloud Backup Notice', result.message || 'Could not connect to sync server.');
+      }
+    } catch (e: any) {
+      Alert.alert('Backup Error', e?.message || 'Failed to sync with cloud.');
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
+
+  const handleRestoreFromCloud = async () => {
+    Alert.alert(
+      'Restore from MongoDB Atlas?',
+      'This will retrieve all bills, quotations, and profile settings from your MongoDB Atlas cloud database. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore Data',
+          style: 'default',
+          onPress: async () => {
+            setRestoringCloud(true);
+            try {
+              const res = await restoreAllFromCloud();
+              if (res.success) {
+                Alert.alert(
+                  'Cloud Restore Complete',
+                  `✓ Successfully restored ${res.billsRestored} bills from MongoDB Atlas!`
+                );
+                await loadProfile();
+                await loadCloudSyncState();
+              } else {
+                Alert.alert('Restore Notice', res.message);
+              }
+            } catch (e: any) {
+              Alert.alert('Restore Failed', e?.message || 'Could not restore from cloud.');
+            } finally {
+              setRestoringCloud(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleAutoSync = async (val: boolean) => {
+    setAutoSync(val);
+    await setAutoSyncEnabled(val);
+  };
 
   const loadProfile = async () => {
     try {
@@ -273,6 +374,106 @@ export const SettingsScreen: React.FC = () => {
             />
           </View>
 
+          {/* MongoDB Atlas Cloud Database & Backup Card */}
+          <View style={styles.cloudCard}>
+            <View style={styles.cloudHeader}>
+              <View style={styles.cloudIconBadge}>
+                <MaterialIcons name="cloud-done" size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.cloudTitle}>MONGODB ATLAS CLOUD BACKUP</Text>
+                <Text style={styles.cloudSub}>
+                  Cluster0 • siteflow_db (orqhcqp.mongodb.net)
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.cloudStatusBadge,
+                  cloudStatus.connected ? styles.statusOnline : styles.statusOffline,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: cloudStatus.connected ? '#16A34A' : '#F59E0B' },
+                  ]}
+                />
+                <Text style={styles.cloudStatusText}>
+                  {cloudStatus.connected ? 'Connected' : 'Sync Ready'}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.cloudDesc}>
+              All contractor bills, payment receipts, and business profile details are safely backed up to MongoDB Atlas. Even if local storage is reset or you switch devices, you can retrieve your data anytime.
+            </Text>
+
+            <View style={styles.cloudStatsRow}>
+              <View style={styles.cloudStatBox}>
+                <Text style={styles.cloudStatLabel}>LAST CLOUD BACKUP</Text>
+                <Text style={styles.cloudStatValue}>{lastSyncText}</Text>
+              </View>
+              <View style={styles.cloudStatDivider} />
+              <View style={styles.cloudStatBox}>
+                <Text style={styles.cloudStatLabel}>DATABASE CLUSTER</Text>
+                <Text style={[styles.cloudStatValue, { color: '#0F172A', fontWeight: '800' }]}>
+                  MongoDB Atlas
+                </Text>
+              </View>
+            </View>
+
+            {/* Auto-Sync Switch */}
+            <View style={styles.autoSyncRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.autoSyncTitle}>Auto-Sync on Bill Changes</Text>
+                <Text style={styles.autoSyncSub}>
+                  Automatically back up every time a bill or payment is saved
+                </Text>
+              </View>
+              <Switch
+                value={autoSync}
+                onValueChange={handleToggleAutoSync}
+                trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
+                thumbColor={autoSync ? '#16A34A' : '#94A3B8'}
+              />
+            </View>
+
+            {/* Action Buttons: Backup Now & Restore */}
+            <View style={styles.cloudButtonsRow}>
+              <TouchableOpacity
+                onPress={handleBackupToCloud}
+                disabled={syncingCloud || restoringCloud}
+                style={[styles.cloudActionBtn, styles.backupBtn]}
+                activeOpacity={0.8}
+              >
+                {syncingCloud ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialIcons name="cloud-upload" size={18} color="#FFFFFF" />
+                    <Text style={styles.cloudBtnText}>Backup Now to Atlas</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleRestoreFromCloud}
+                disabled={syncingCloud || restoringCloud}
+                style={[styles.cloudActionBtn, styles.restoreBtn]}
+                activeOpacity={0.8}
+              >
+                {restoringCloud ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <>
+                    <MaterialIcons name="cloud-download" size={18} color={COLORS.primary} />
+                    <Text style={styles.restoreBtnText}>Restore from Cloud</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Account Details & Logout */}
           <View style={styles.accountCard}>
             <View style={styles.accountHeader}>
@@ -423,6 +624,158 @@ const styles = StyleSheet.create({
   },
   saveActionWrap: {
     marginTop: 4,
+  },
+  cloudCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderLeftWidth: 5,
+    borderLeftColor: '#16A34A',
+    elevation: 3,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  cloudHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cloudIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cloudTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#15803D',
+    letterSpacing: 0.6,
+  },
+  cloudSub: {
+    fontSize: 10.5,
+    color: COLORS.textMuted,
+    marginTop: 1,
+    fontWeight: '600',
+  },
+  cloudStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusOnline: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusOffline: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cloudStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  cloudDesc: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  cloudStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  cloudStatBox: {
+    flex: 1,
+  },
+  cloudStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 10,
+  },
+  cloudStatLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  cloudStatValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  autoSyncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginBottom: 12,
+  },
+  autoSyncTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  autoSyncSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  cloudButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cloudActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 10,
+  },
+  backupBtn: {
+    backgroundColor: '#16A34A',
+    elevation: 2,
+  },
+  restoreBtn: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  cloudBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  restoreBtnText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '800',
   },
   accountCard: {
     backgroundColor: '#FFFFFF',
