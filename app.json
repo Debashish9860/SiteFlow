@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BillMaker",
-    "slug": "BillMaker",
+    "name": "SiteFlow",
+    "slug": "siteflow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

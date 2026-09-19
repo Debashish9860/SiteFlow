@@ -24,9 +24,11 @@ import {
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -259,6 +261,42 @@ export const SettingsScreen: React.FC = () => {
               onPress={handleSave}
             />
           </View>
+
+          {/* Account Details & Logout */}
+          <View style={styles.accountCard}>
+            <View style={styles.accountHeader}>
+              <View style={styles.accountAvatar}>
+                <MaterialIcons name="person" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.accountName}>{user?.name || 'SiteFlow User'}</Text>
+                <Text style={styles.accountEmail}>{user?.email || 'Logged In'}</Text>
+              </View>
+              <View style={styles.roleTag}>
+                <Text style={styles.roleTagText}>{user?.role?.toUpperCase() || 'USER'}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert('Log Out', 'Are you sure you want to log out of SiteFlow?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await logout();
+                    },
+                  },
+                ]);
+              }}
+              style={styles.logoutBtn}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="logout" size={18} color={COLORS.danger} />
+              <Text style={styles.logoutBtnText}>Log Out of SiteFlow</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -374,5 +412,69 @@ const styles = StyleSheet.create({
   },
   saveActionWrap: {
     marginTop: 4,
+  },
+  accountCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  accountHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  accountAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  accountEmail: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  roleTag: {
+    backgroundColor: 'rgba(124, 16, 52, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  roleTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    marginTop: 4,
+  },
+  logoutBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.danger,
   },
 });

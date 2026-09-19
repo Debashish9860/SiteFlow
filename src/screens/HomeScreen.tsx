@@ -18,6 +18,7 @@ import { getBills, getBusinessProfile } from '../services/storageService';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
+import { useAuth } from '../context/AuthContext';
 
 // Animated Item Card for smooth staggered entrance
 const AnimatedBillCard: React.FC<{
@@ -143,6 +144,7 @@ const AnimatedBillCard: React.FC<{
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { user } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [loading, setLoading] = useState(false);
@@ -242,9 +244,11 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.headerContent}>
           <View style={styles.badgeRow}>
             <View style={styles.proTag}>
-              <Text style={styles.proTagText}>BILLMAKER PRO</Text>
+              <Text style={styles.proTagText}>SITEFLOW PRO</Text>
             </View>
-            <Text style={styles.phoneSub}>📞 {profile?.phone || '+91 9860980626'}</Text>
+            <Text style={styles.phoneSub}>
+              {user?.name ? `👤 ${user.name}` : `📞 ${profile?.phone || '+91 9860980626'}`}
+            </Text>
           </View>
           <Text style={styles.businessTitle} numberOfLines={1}>
             {profile?.ownerName || 'RAMESH RAUT'}
