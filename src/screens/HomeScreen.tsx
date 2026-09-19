@@ -19,6 +19,128 @@ import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
 
+// Animated Item Card for smooth staggered entrance
+const AnimatedBillCard: React.FC<{
+  item: Bill;
+  index: number;
+  onPress: () => void;
+}> = ({ item, index, onPress }) => {
+  const isQuote = item.billType === 'quotation';
+  const itemTotal = item.subtotal - item.discount;
+  const itemAnim = useRef(new Animated.Value(0)).current;
+  const itemTranslateY = useRef(new Animated.Value(18)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(itemAnim, {
+        toValue: 1,
+        duration: 320,
+        delay: Math.min(index * 45, 260),
+        useNativeDriver: true,
+      }),
+      Animated.spring(itemTranslateY, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        delay: Math.min(index * 45, 260),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: itemAnim,
+        transform: [{ translateY: itemTranslateY }],
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.82}
+        style={[
+          styles.billCard,
+          isQuote ? styles.billCardQuote : styles.billCardInvoice,
+        ]}
+        onPress={onPress}
+      >
+        {/* Card Top Row */}
+        <View style={styles.billCardTop}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <View style={styles.tagRow}>
+              <View
+                style={[
+                  styles.docTypeTag,
+                  isQuote ? styles.docTypeTagQuote : styles.docTypeTagInvoice,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.docTypeTagText,
+                    isQuote ? styles.docTypeTagTextQuote : styles.docTypeTagTextInvoice,
+                  ]}
+                >
+                  {isQuote ? 'QUOTATION' : 'INVOICE'}
+                </Text>
+              </View>
+              <Text style={styles.billedByTag}>👤 {item.billedBy || 'Ramesh Raut'}</Text>
+            </View>
+
+            {/* Client Name in BOLD */}
+            <Text style={styles.clientName}>{item.customerName}</Text>
+
+            {/* Below client name, site name on the right side */}
+            <View style={styles.siteRowRight}>
+              <Text style={styles.siteLabelSmall}>Site:</Text>
+              <Text style={styles.siteTextRight}>
+                {item.siteLocation || '—'}
+                {item.siteCity ? `, ${item.siteCity}` : ''}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.billAmount}>₹{itemTotal.toLocaleString('en-IN')}/-</Text>
+            <Text style={styles.billDate}>{formatDate(item.date)}</Text>
+          </View>
+        </View>
+
+        {/* Card Bottom Row */}
+        <View style={styles.billCardBottom}>
+          <View style={styles.billMeta}>
+            <Text style={styles.billMetaText}>
+              {item.billNumber} • {item.items.length} particulars
+            </Text>
+          </View>
+
+          {isQuote ? (
+            <View style={styles.quoteStatusBadge}>
+              <Text style={styles.quoteStatusText}>Estimate Ready</Text>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.statusBadge,
+                item.balanceDue > 0 ? styles.statusDue : styles.statusPaid,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  item.balanceDue > 0 ? styles.statusDueText : styles.statusPaidText,
+                ]}
+              >
+                {item.balanceDue > 0
+                  ? `Due: ${formatCurrency(item.balanceDue)}`
+                  : 'Fully Paid ✓'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [bills, setBills] = useState<Bill[]>([]);
@@ -28,13 +150,51 @@ export const HomeScreen: React.FC = () => {
 
   // Animation references
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideUpAnim = useRef(new Animated.Value(24)).current;
+  const statsScaleAnim = useRef(new Animated.Value(0.96)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Pulse animation for create button
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.02,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  // Screen entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 380,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideUpAnim, {
+        toValue: 0,
+        friction: 7,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.spring(statsScaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 60,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const loadData = async () => {
@@ -111,57 +271,118 @@ export const HomeScreen: React.FC = () => {
           }
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
-            <View>
-              {/* Summary Cards */}
-              <View style={styles.summaryRow}>
-                {/* Total Invoiced Card */}
-                <View style={[styles.summaryCard, styles.cardInvoiced]}>
-                  <View style={styles.summaryHeader}>
-                    <Text style={styles.summaryLabel}>Total Invoiced</Text>
-                    <MaterialIcons name="receipt-long" size={18} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.summaryAmount}>{formatCurrency(totalInvoiced)}</Text>
-                  <Text style={styles.summarySub}>{invoices.length} Invoices issued</Text>
-                </View>
-
-                {/* Pending Due Card */}
-                <View style={[styles.summaryCard, styles.cardDue]}>
-                  <View style={styles.summaryHeader}>
-                    <Text style={[styles.summaryLabel, { color: '#B91C1C' }]}>Pending Due</Text>
-                    <MaterialIcons name="pending-actions" size={18} color="#DC2626" />
-                  </View>
-                  <Text style={[styles.summaryAmount, { color: '#DC2626' }]}>
-                    {formatCurrency(totalDue)}
-                  </Text>
-                  <Text style={[styles.summarySub, { color: '#B91C1C' }]}>Balance to collect</Text>
-                </View>
-              </View>
-
-              {/* Quotations Card */}
-              <View style={styles.quotationSummaryCard}>
-                <View style={styles.quoteCardLeft}>
-                  <View style={styles.quoteIconBadge}>
-                    <MaterialIcons name="request-quote" size={20} color={COLORS.primary} />
-                  </View>
-                  <View>
-                    <Text style={styles.quoteCardTitle}>Quotations</Text>
-                    <Text style={styles.quoteCardSub}>
-                      {quotations.length} Active • Value: {formatCurrency(totalQuoted)}
-                    </Text>
-                  </View>
-                </View>
+            <Animated.View
+              style={{
+                transform: [{ translateY: slideUpAnim }, { scale: statsScaleAnim }],
+              }}
+            >
+              {/* Financial Stats Overview */}
+              <View style={styles.statsContainer}>
+                {/* 1. Hero Revenue Card */}
                 <TouchableOpacity
-                  onPress={() => {
-                    navigation.navigate('CreateBill');
-                  }}
-                  style={styles.quoteQuickBtn}
+                  activeOpacity={0.85}
+                  onPress={() => setFilterType(filterType === 'invoice' ? 'all' : 'invoice')}
+                  style={[
+                    styles.heroSummaryCard,
+                    filterType === 'invoice' && styles.heroCardActive,
+                  ]}
                 >
-                  <Text style={styles.quoteQuickBtnText}>+ Create</Text>
+                  <View style={styles.heroCardHeader}>
+                    <View style={styles.heroLabelRow}>
+                      <View style={styles.heroIconBadge}>
+                        <MaterialIcons name="account-balance-wallet" size={20} color="#FFFFFF" />
+                      </View>
+                      <View>
+                        <Text style={styles.heroCardLabel}>TOTAL INVOICED REVENUE</Text>
+                        <Text style={styles.heroCardSub}>
+                          {invoices.length} {invoices.length === 1 ? 'Invoice' : 'Invoices'} issued
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      style={[
+                        styles.filterBadgePill,
+                        filterType === 'invoice' && styles.filterBadgePillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.filterBadgeText,
+                          filterType === 'invoice' && styles.filterBadgeTextActive,
+                        ]}
+                      >
+                        {filterType === 'invoice' ? 'SHOWING INVOICES' : 'TAP TO FILTER'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.heroAmount}>{formatCurrency(totalInvoiced)}</Text>
                 </TouchableOpacity>
+
+                {/* 2. Symmetrical Twin Metric Cards: Pending Due & Quotations */}
+                <View style={styles.twinCardsRow}>
+                  {/* Left: Pending Due Card */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setFilterType(filterType === 'invoice' ? 'all' : 'invoice')}
+                    style={[
+                      styles.twinCard,
+                      styles.twinCardDue,
+                      filterType === 'invoice' && styles.twinCardActive,
+                    ]}
+                  >
+                    <View style={styles.twinCardHeader}>
+                      <Text style={[styles.twinCardLabel, { color: '#B91C1C' }]}>PENDING DUE</Text>
+                      <View style={styles.dueIconBadge}>
+                        <MaterialIcons name="pending-actions" size={16} color="#DC2626" />
+                      </View>
+                    </View>
+                    <Text style={[styles.twinAmount, { color: '#DC2626' }]}>
+                      {formatCurrency(totalDue)}
+                    </Text>
+                    <View style={styles.twinCardFooter}>
+                      <Text style={styles.twinSubDue}>
+                        {invoices.filter((i) => i.balanceDue > 0).length} unpaid bills
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Right: Quotations Card */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setFilterType(filterType === 'quotation' ? 'all' : 'quotation')}
+                    style={[
+                      styles.twinCard,
+                      styles.twinCardQuote,
+                      filterType === 'quotation' && styles.twinCardActive,
+                    ]}
+                  >
+                    <View style={styles.twinCardHeader}>
+                      <Text style={[styles.twinCardLabel, { color: '#B45309' }]}>QUOTATIONS</Text>
+                      <View style={styles.quoteIconBadge}>
+                        <MaterialIcons name="request-quote" size={16} color="#D97706" />
+                      </View>
+                    </View>
+                    <Text style={[styles.twinAmount, { color: '#B45309' }]}>
+                      {formatCurrency(totalQuoted)}
+                    </Text>
+                    <View style={styles.twinCardFooter}>
+                      <Text style={styles.twinSubQuote}>
+                        {quotations.length} {quotations.length === 1 ? 'estimate' : 'estimates'} active
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              {/* Prominent Action Button */}
-              <View style={styles.actionContainer}>
+              {/* Prominent Action Button with Gentle Pulse Animation */}
+              <Animated.View
+                style={[
+                  styles.actionContainer,
+                  {
+                    transform: [{ scale: pulseAnim }],
+                  },
+                ]}
+              >
                 <BigButton
                   title="+ Create New Bill / Quotation"
                   subtitle="Add particulars, rates, and quantities"
@@ -170,7 +391,7 @@ export const HomeScreen: React.FC = () => {
                   onPress={() => navigation.navigate('CreateBill')}
                   style={styles.createBtnGlow}
                 />
-              </View>
+              </Animated.View>
 
               {/* Filter Tabs */}
               <View style={styles.filterTabsRow}>
@@ -220,97 +441,15 @@ export const HomeScreen: React.FC = () => {
                   </Text>
                 </View>
               )}
-            </View>
+            </Animated.View>
           }
-          renderItem={({ item }) => {
-            const isQuote = item.billType === 'quotation';
-            const itemTotal = item.subtotal - item.discount;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[
-                  styles.billCard,
-                  isQuote ? styles.billCardQuote : styles.billCardInvoice,
-                ]}
-                onPress={() => navigation.navigate('BillDetail', { billId: item.id })}
-              >
-                {/* Card Top Row */}
-                <View style={styles.billCardTop}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <View style={styles.tagRow}>
-                      <View
-                        style={[
-                          styles.docTypeTag,
-                          isQuote ? styles.docTypeTagQuote : styles.docTypeTagInvoice,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.docTypeTagText,
-                            isQuote ? styles.docTypeTagTextQuote : styles.docTypeTagTextInvoice,
-                          ]}
-                        >
-                          {isQuote ? 'QUOTATION' : 'INVOICE'}
-                        </Text>
-                      </View>
-                      <Text style={styles.billedByTag}>👤 {item.billedBy || 'Ramesh Raut'}</Text>
-                    </View>
-
-                    {/* Client Name in BOLD */}
-                    <Text style={styles.clientName}>
-                      {item.customerName}
-                    </Text>
-
-                    {/* Below client name, site name on the right side */}
-                    <View style={styles.siteRowRight}>
-                      <Text style={styles.siteLabelSmall}>Site:</Text>
-                      <Text style={styles.siteTextRight}>
-                        {item.siteLocation || '—'}{item.siteCity ? `, ${item.siteCity}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.billAmount}>₹{itemTotal.toLocaleString('en-IN')}/-</Text>
-                    <Text style={styles.billDate}>{formatDate(item.date)}</Text>
-                  </View>
-                </View>
-
-                {/* Card Bottom Row */}
-                <View style={styles.billCardBottom}>
-                  <View style={styles.billMeta}>
-                    <Text style={styles.billMetaText}>
-                      {item.billNumber} • {item.items.length} particulars
-                    </Text>
-                  </View>
-
-                  {isQuote ? (
-                    <View style={styles.quoteStatusBadge}>
-                      <Text style={styles.quoteStatusText}>Estimate Ready</Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        item.balanceDue > 0 ? styles.statusDue : styles.statusPaid,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusBadgeText,
-                          item.balanceDue > 0 ? styles.statusDueText : styles.statusPaidText,
-                        ]}
-                      >
-                        {item.balanceDue > 0
-                          ? `Due: ${formatCurrency(item.balanceDue)}`
-                          : 'Fully Paid ✓'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item, index }) => (
+            <AnimatedBillCard
+              item={item}
+              index={index}
+              onPress={() => navigation.navigate('BillDetail', { billId: item.id })}
+            />
+          )}
         />
       </Animated.View>
     </SafeAreaView>
@@ -387,102 +526,160 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     paddingBottom: SPACING.xxl,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
+  statsContainer: {
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  summaryCard: {
-    flex: 1,
-    padding: SPACING.md,
-    borderRadius: 14,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    borderWidth: 1,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardInvoiced: {
+  heroSummaryCard: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
     borderColor: '#F1D9DE',
-    borderLeftWidth: 4,
+    borderLeftWidth: 5,
     borderLeftColor: COLORS.primary,
+    marginBottom: 10,
+    elevation: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  cardDue: {
-    backgroundColor: '#FFF5F5',
-    borderColor: '#FED7D7',
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.danger,
+  heroCardActive: {
+    backgroundColor: '#FCF5F7',
+    borderColor: COLORS.primary,
   },
-  summaryLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-  },
-  summaryAmount: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '900',
-    color: COLORS.textPrimary,
-    marginVertical: 4,
-  },
-  summarySub: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-  },
-  quotationSummaryCard: {
+  heroCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.accentDark,
-    marginBottom: SPACING.sm,
+    alignItems: 'center',
+    marginBottom: 6,
   },
-  quoteCardLeft: {
+  heroLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  quoteIconBadge: {
+  heroIconBadge: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCardLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.8,
+  },
+  heroCardSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  filterBadgePill: {
+    backgroundColor: 'rgba(124, 16, 52, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  filterBadgePillActive: {
+    backgroundColor: COLORS.primary,
+  },
+  filterBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  filterBadgeTextActive: {
+    color: '#FFFFFF',
+  },
+  heroAmount: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: COLORS.textPrimary,
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+  twinCardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  twinCard: {
+    flex: 1,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    justifyContent: 'space-between',
+    minHeight: 106,
+  },
+  twinCardDue: {
+    backgroundColor: '#FFF8F8',
+    borderColor: '#FEE2E2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  twinCardQuote: {
+    backgroundColor: '#FFFDF5',
+    borderColor: '#FEF3C7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  twinCardActive: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  twinCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  twinCardLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  dueIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quoteIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quoteCardTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
+  twinAmount: {
+    fontSize: 17,
+    fontWeight: '900',
+    marginVertical: 4,
   },
-  quoteCardSub: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    marginTop: 1,
+  twinCardFooter: {
+    marginTop: 2,
   },
-  quoteQuickBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
+  twinSubDue: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#DC2626',
   },
-  quoteQuickBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
+  twinSubQuote: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#B45309',
   },
   actionContainer: {
     marginVertical: 6,
