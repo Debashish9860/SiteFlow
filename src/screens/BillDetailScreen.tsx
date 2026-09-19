@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from '../utils/formatters';
 import { numberToWordsIndian } from '../utils/numberToWords';
 import { BigButton } from '../components/BigButton';
 import { MaterialIcons } from '@expo/vector-icons';
+import { RegisterPaymentModal } from '../components/RegisterPaymentModal';
 
 export const BillDetailScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -31,6 +32,7 @@ export const BillDetailScreen: React.FC = () => {
   const [isSharing, setIsSharing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
   useEffect(() => {
     loadBillDetails();
@@ -185,6 +187,136 @@ export const BillDetailScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Payment Tracking & Register Card */}
+        <View style={styles.paymentCard}>
+          <View style={styles.paymentCardHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <View style={styles.paymentIconBadge}>
+                <MaterialIcons name="account-balance-wallet" size={18} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.paymentCardTitle}>PAYMENT STATUS</Text>
+                <Text style={styles.paymentCardSub}>
+                  {bill.balanceDue === 0 ? 'Document is settled' : 'Payment collection tracking'}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.paymentStatusPill,
+                bill.balanceDue === 0
+                  ? styles.paymentStatusPaid
+                  : (bill.advancePaid || 0) > 0
+                  ? styles.paymentStatusPartial
+                  : styles.paymentStatusDue,
+              ]}
+            >
+              <MaterialIcons
+                name={bill.balanceDue === 0 ? 'check-circle' : 'pending'}
+                size={13}
+                color="#FFFFFF"
+              />
+              <Text style={styles.paymentStatusText}>
+                {bill.balanceDue === 0
+                  ? 'FULLY PAID'
+                  : (bill.advancePaid || 0) > 0
+                  ? 'PARTIALLY PAID'
+                  : 'PENDING'}
+              </Text>
+            </View>
+          </View>
+
+          {/* 3 Metric Columns */}
+          <View style={styles.paymentMetricsRow}>
+            <View style={styles.paymentMetricBox}>
+              <Text style={styles.metricLabel}>TOTAL BILL</Text>
+              <Text style={styles.metricValue}>{formatCurrency(totalAmount)}</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.paymentMetricBox}>
+              <Text style={styles.metricLabel}>RECEIVED</Text>
+              <Text style={[styles.metricValue, { color: COLORS.success }]}>
+                {formatCurrency(bill.advancePaid || 0)}
+              </Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.paymentMetricBox}>
+              <Text style={styles.metricLabel}>BALANCE DUE</Text>
+              <Text
+                style={[
+                  styles.metricValue,
+                  { color: bill.balanceDue === 0 ? COLORS.success : COLORS.primary, fontWeight: '900' },
+                ]}
+              >
+                {bill.balanceDue === 0 ? '₹ 0 (Paid)' : formatCurrency(bill.balanceDue)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Progress Bar */}
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${Math.min(100, Math.round(((bill.advancePaid || 0) / (totalAmount || 1)) * 100))}%`,
+                  backgroundColor: bill.balanceDue === 0 ? COLORS.success : '#D97706',
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.progressPercentRow}>
+            <Text style={styles.progressPercentText}>
+              {Math.min(100, Math.round(((bill.advancePaid || 0) / (totalAmount || 1)) * 100))}% Collected
+            </Text>
+            {bill.balanceDue > 0 && (
+              <Text style={styles.progressDueText}>
+                {formatCurrency(bill.balanceDue)} Remaining
+              </Text>
+            )}
+          </View>
+
+          {/* Action to Register Payment */}
+          <TouchableOpacity
+            onPress={() => setPaymentModalVisible(true)}
+            style={[
+              styles.recordPaymentBtn,
+              bill.balanceDue === 0 && styles.recordPaymentBtnSettled,
+            ]}
+            activeOpacity={0.82}
+          >
+            <MaterialIcons
+              name={bill.balanceDue === 0 ? 'edit' : 'add-card'}
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={styles.recordPaymentBtnText}>
+              {bill.balanceDue === 0 ? 'Adjust Payment Details' : 'Register Payment Received (+)'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Payment History List if any records */}
+          {bill.paymentRecords && bill.paymentRecords.length > 0 && (
+            <View style={styles.paymentHistoryWrap}>
+              <Text style={styles.paymentHistoryTitle}>PAYMENT HISTORY LOG:</Text>
+              {bill.paymentRecords.map((rec) => (
+                <View key={rec.id} style={styles.historyRow}>
+                  <View style={styles.historyLeft}>
+                    <MaterialIcons name="check-circle" size={14} color={COLORS.success} />
+                    <View>
+                      <Text style={styles.historyMode}>
+                        {rec.mode || 'Cash'} {rec.note ? `• ${rec.note}` : ''}
+                      </Text>
+                      <Text style={styles.historyDate}>{rec.date}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.historyAmount}>+ {formatCurrency(rec.amount)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Status Notification Banner */}
         <View style={styles.previewNotice}>
           <MaterialIcons name="visibility" size={18} color={COLORS.primary} />
@@ -318,6 +450,33 @@ export const BillDetailScreen: React.FC = () => {
                 </Text>
               </View>
             </View>
+
+            {/* If payment received, show on letterhead */}
+            {(bill.advancePaid || 0) > 0 && (
+              <View style={styles.letterheadPaymentBox}>
+                <View style={styles.letterheadPaymentRow}>
+                  <Text style={styles.letterheadPayLabel}>Amount Received / Paid:</Text>
+                  <Text style={styles.letterheadPayVal}>
+                    ₹ {(bill.advancePaid || 0).toLocaleString('en-IN')}/-
+                  </Text>
+                </View>
+                <View style={styles.letterheadPaymentRow}>
+                  <Text style={styles.letterheadPayLabel}>
+                    {bill.balanceDue === 0 ? 'Status:' : 'Balance Due:'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.letterheadPayVal,
+                      { color: bill.balanceDue === 0 ? COLORS.success : COLORS.primary, fontWeight: '900' },
+                    ]}
+                  >
+                    {bill.balanceDue === 0
+                      ? 'FULLY PAID ✓'
+                      : `₹ ${bill.balanceDue.toLocaleString('en-IN')}/-`}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Signatory Footer */}
@@ -331,6 +490,16 @@ export const BillDetailScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Interactive Payment Register Modal */}
+      <RegisterPaymentModal
+        visible={paymentModalVisible}
+        bill={bill}
+        onClose={() => setPaymentModalVisible(false)}
+        onPaymentSuccess={(updatedBill) => {
+          setBill(updatedBill);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -697,5 +866,215 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.textSecondary,
     marginTop: 4,
+  },
+  paymentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: '#F1D9DE',
+    elevation: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  paymentCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  paymentIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentCardTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.primary,
+    letterSpacing: 0.8,
+  },
+  paymentCardSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  paymentStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  paymentStatusPaid: {
+    backgroundColor: '#16A34A',
+  },
+  paymentStatusPartial: {
+    backgroundColor: '#D97706',
+  },
+  paymentStatusDue: {
+    backgroundColor: '#DC2626',
+  },
+  paymentStatusText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  paymentMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  paymentMetricBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  metricValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  metricDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#CBD5E1',
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressPercentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 5,
+    marginBottom: 12,
+  },
+  progressPercentText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  progressDueText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  recordPaymentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  recordPaymentBtnSettled: {
+    backgroundColor: '#334155',
+  },
+  recordPaymentBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
+  paymentHistoryWrap: {
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  paymentHistoryTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  historyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  historyMode: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  historyDate: {
+    fontSize: 9.5,
+    color: COLORS.textMuted,
+  },
+  historyAmount: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.success,
+  },
+  letterheadPaymentBox: {
+    marginTop: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  letterheadPaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  letterheadPayLabel: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  letterheadPayVal: {
+    fontSize: 12,
+    color: '#0F172A',
+    fontWeight: '700',
   },
 });

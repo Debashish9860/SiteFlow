@@ -228,6 +228,37 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
             align-items: stretch;
             height: 48px;
           }
+          .totals-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+          }
+          .payment-sub-table {
+            margin-top: 6px;
+            width: 100%;
+            min-width: 220px;
+            font-size: 11px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 4px;
+            padding: 6px 12px;
+          }
+          .pay-sub-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 2px 0;
+            color: #334155;
+          }
+          .pay-sub-row strong {
+            color: #0F172A;
+          }
+          .due-row {
+            border-top: 1px dashed #CBD5E1;
+            margin-top: 2px;
+            padding-top: 3px;
+            font-weight: 800;
+          }
           .grand-total-label {
             background-color: #7C1034;
             color: #FFFFFF;
@@ -347,9 +378,29 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
                 <div class="words-val">${amountInWords}</div>
               </div>
 
-              <div class="grand-total-wrap">
-                <div class="grand-total-label">GRAND TOTAL</div>
-                <div class="grand-total-val">₹ ${totalAmount.toLocaleString('en-IN')}/-</div>
+              <div class="totals-column">
+                <div class="grand-total-wrap">
+                  <div class="grand-total-label">GRAND TOTAL</div>
+                  <div class="grand-total-val">₹ ${totalAmount.toLocaleString('en-IN')}/-</div>
+                </div>
+                ${
+                  (bill.advancePaid || 0) > 0
+                    ? `
+                  <div class="payment-sub-table">
+                    <div class="pay-sub-row">
+                      <span>Received / Paid:</span>
+                      <strong>₹ ${(bill.advancePaid || 0).toLocaleString('en-IN')}/-</strong>
+                    </div>
+                    <div class="pay-sub-row due-row">
+                      <span>${bill.balanceDue === 0 ? 'Status:' : 'Balance Due:'}</span>
+                      <strong style="color: ${bill.balanceDue === 0 ? '#15803D' : '#7C1034'};">
+                        ${bill.balanceDue === 0 ? 'FULLY PAID ✓' : `₹ ${bill.balanceDue.toLocaleString('en-IN')}/-`}
+                      </strong>
+                    </div>
+                  </div>
+                `
+                    : ''
+                }
               </div>
             </div>
           </div>

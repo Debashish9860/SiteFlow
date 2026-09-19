@@ -12,6 +12,15 @@ export interface BillItem {
   amount: number;
 }
 
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+  mode: 'Cash' | 'UPI' | 'Bank Transfer' | 'Cheque' | string;
+  note?: string;
+  receivedAt: number;
+}
+
 export interface Bill {
   id: string;
   billNumber: string;
@@ -31,6 +40,7 @@ export interface Bill {
   advancePaid: number;
   balanceDue: number;
   notes?: string;
+  paymentRecords?: PaymentRecord[];
   createdAt: number;
 }
 

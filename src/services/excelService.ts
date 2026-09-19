@@ -72,9 +72,16 @@ export async function exportBillToExcel(bill: Bill, profile: BusinessProfile): P
       rows.push(['', '', '', '', 'DISCOUNT (₹):', bill.discount]);
     }
     if (bill.advancePaid > 0) {
-      rows.push(['', '', '', '', 'ADVANCE PAID (₹):', bill.advancePaid]);
+      rows.push(['', '', '', '', 'AMOUNT RECEIVED (₹):', bill.advancePaid]);
     }
-    rows.push(['', '', '', '', 'BALANCE DUE (₹):', bill.balanceDue]);
+    rows.push([
+      '',
+      '',
+      '',
+      '',
+      bill.balanceDue === 0 ? 'STATUS:' : 'BALANCE DUE (₹):',
+      bill.balanceDue === 0 ? 'FULLY PAID ✓' : bill.balanceDue,
+    ]);
   }
 
   // Footer

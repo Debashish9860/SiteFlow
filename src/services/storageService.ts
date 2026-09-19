@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Bill, BusinessProfile } from '../types/bill';
+import { Bill, BusinessProfile, PaymentRecord } from '../types/bill';
 
 const BILLS_KEY = '@billmaker_bills';
 const PROFILE_KEY = '@billmaker_profile';
@@ -30,6 +30,7 @@ export async function getBills(): Promise<Bill[]> {
         billedByTitle: b.billedByTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR',
         billedByPhone: b.billedByPhone || '+91 9860980626',
         billedByAddress: b.billedByAddress || 'Sus, Pune - 411021',
+        paymentRecords: b.paymentRecords || [],
       }))
       .sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
@@ -50,6 +51,83 @@ export async function saveBill(newBill: Bill): Promise<void> {
     await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
   } catch (error) {
     console.error('Error saving bill:', error);
+    throw error;
+  }
+}
+
+export async function registerBillPayment(
+  billId: string,
+  amountReceived: number,
+  mode: string = 'Cash',
+  note?: string
+): Promise<Bill> {
+  try {
+    const bills = await getBills();
+    const billIndex = bills.findIndex((b) => b.id === billId);
+    if (billIndex === -1) {
+      throw new Error('Bill not found');
+    }
+
+    const bill = bills[billIndex];
+    const netTotal = Math.max(0, bill.subtotal - (bill.discount || 0));
+    const currentPaid = bill.advancePaid || 0;
+    const newTotalPaid = Math.min(netTotal, currentPaid + amountReceived);
+    const newBalanceDue = Math.max(0, netTotal - newTotalPaid);
+
+    const newRecord: PaymentRecord = {
+      id: `pay_${Date.now()}`,
+      amount: amountReceived,
+      date: new Date().toISOString().split('T')[0],
+      mode: mode,
+      note: note ? note.trim() : undefined,
+      receivedAt: Date.now(),
+    };
+
+    const updatedRecords = bill.paymentRecords ? [newRecord, ...bill.paymentRecords] : [newRecord];
+
+    const updatedBill: Bill = {
+      ...bill,
+      advancePaid: newTotalPaid,
+      balanceDue: newBalanceDue,
+      paymentRecords: updatedRecords,
+    };
+
+    bills[billIndex] = updatedBill;
+    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    return updatedBill;
+  } catch (error) {
+    console.error('Error registering bill payment:', error);
+    throw error;
+  }
+}
+
+export async function updateBillPaymentStatus(
+  billId: string,
+  totalPaid: number
+): Promise<Bill> {
+  try {
+    const bills = await getBills();
+    const billIndex = bills.findIndex((b) => b.id === billId);
+    if (billIndex === -1) {
+      throw new Error('Bill not found');
+    }
+
+    const bill = bills[billIndex];
+    const netTotal = Math.max(0, bill.subtotal - (bill.discount || 0));
+    const validatedPaid = Math.max(0, Math.min(netTotal, totalPaid));
+    const validatedDue = Math.max(0, netTotal - validatedPaid);
+
+    const updatedBill: Bill = {
+      ...bill,
+      advancePaid: validatedPaid,
+      balanceDue: validatedDue,
+    };
+
+    bills[billIndex] = updatedBill;
+    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    return updatedBill;
+  } catch (error) {
+    console.error('Error updating bill payment status:', error);
     throw error;
   }
 }

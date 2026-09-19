@@ -25,13 +25,15 @@ import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
 import { useAuth } from '../context/AuthContext';
+import { RegisterPaymentModal } from '../components/RegisterPaymentModal';
 
 // Animated Item Card for smooth staggered entrance
 const AnimatedBillCard: React.FC<{
   item: Bill;
   index: number;
   onPress: () => void;
-}> = ({ item, index, onPress }) => {
+  onReceivePayment?: () => void;
+}> = ({ item, index, onPress, onReceivePayment }) => {
   const isQuote = item.billType === 'quotation';
   const itemTotal = item.subtotal - item.discount;
   const itemAnim = useRef(new Animated.Value(0)).current;
@@ -124,22 +126,34 @@ const AnimatedBillCard: React.FC<{
               <Text style={styles.quoteStatusText}>Estimate Ready</Text>
             </View>
           ) : (
-            <View
-              style={[
-                styles.statusBadge,
-                item.balanceDue > 0 ? styles.statusDue : styles.statusPaid,
-              ]}
-            >
-              <Text
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View
                 style={[
-                  styles.statusBadgeText,
-                  item.balanceDue > 0 ? styles.statusDueText : styles.statusPaidText,
+                  styles.statusBadge,
+                  item.balanceDue > 0 ? styles.statusDue : styles.statusPaid,
                 ]}
               >
-                {item.balanceDue > 0
-                  ? `Due: ${formatCurrency(item.balanceDue)}`
-                  : 'Fully Paid ✓'}
-              </Text>
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    item.balanceDue > 0 ? styles.statusDueText : styles.statusPaidText,
+                  ]}
+                >
+                  {item.balanceDue > 0
+                    ? `Due: ${formatCurrency(item.balanceDue)}`
+                    : 'Fully Paid ✓'}
+                </Text>
+              </View>
+              {item.balanceDue > 0 && onReceivePayment && (
+                <TouchableOpacity
+                  onPress={onReceivePayment}
+                  style={styles.quickPayChip}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="add-circle" size={13} color="#FFFFFF" />
+                  <Text style={styles.quickPayChipText}>Receive</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -156,6 +170,7 @@ export const HomeScreen: React.FC = () => {
   const [presets, setPresets] = useState<ContractorPreset[]>(DEFAULT_CONTRACTOR_PRESETS);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'invoice' | 'quotation'>('all');
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState<Bill | null>(null);
 
   // Animation references
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -506,10 +521,21 @@ export const HomeScreen: React.FC = () => {
               item={item}
               index={index}
               onPress={() => navigation.navigate('BillDetail', { billId: item.id })}
+              onReceivePayment={() => setSelectedBillForPayment(item)}
             />
           )}
         />
       </Animated.View>
+
+      {/* Interactive Quick Payment Modal */}
+      <RegisterPaymentModal
+        visible={selectedBillForPayment !== null}
+        bill={selectedBillForPayment}
+        onClose={() => setSelectedBillForPayment(null)}
+        onPaymentSuccess={() => {
+          loadData();
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -957,6 +983,21 @@ const styles = StyleSheet.create({
   },
   statusPaidText: {
     color: '#059669',
+  },
+  quickPayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    elevation: 1,
+  },
+  quickPayChipText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
   },
   emptyContainer: {
     alignItems: 'center',
