@@ -31,6 +31,7 @@ import {
 } from '../services/storageService';
 import { STANDARD_UNITS } from '../data/presets';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const POPULAR_PARTICULARS = [
   { name: '1" Elbow', unit: 'pcs', rate: 100 },
@@ -43,7 +44,16 @@ const POPULAR_PARTICULARS = [
 export const CreateBillScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<any>();
+  const { user } = useAuth();
   const { editBillId } = route.params || {};
+
+  const isUserRajeeb = Boolean(
+    user?.name?.toLowerCase().includes('rajeeb') ||
+    user?.email?.toLowerCase().includes('rajeeb')
+  );
+  const initialPreset =
+    DEFAULT_CONTRACTOR_PRESETS.find((p) => p.id === (isUserRajeeb ? 'rajeeb' : 'ramesh')) ||
+    DEFAULT_CONTRACTOR_PRESETS[0];
 
   // Bill Type
   const [billType, setBillType] = useState<BillType>('invoice');
@@ -51,11 +61,13 @@ export const CreateBillScreen: React.FC = () => {
   // Issuer State & Presets
   const [contractorPresets, setContractorPresets] = useState<ContractorPreset[]>(DEFAULT_CONTRACTOR_PRESETS);
   const [showContractorEdit, setShowContractorEdit] = useState(false);
-  const [selectedIssuerId, setSelectedIssuerId] = useState<'ramesh' | 'rajeeb' | 'other'>('ramesh');
-  const [billedByName, setBilledByName] = useState('RAMESH RAUT');
-  const [billedByTitle, setBilledByTitle] = useState('PLUMBING & CIVIL WORKS CONTRACTOR');
-  const [billedByPhone, setBilledByPhone] = useState('+91 9860980626');
-  const [billedByAddress, setBilledByAddress] = useState('Sus, Pune - 411021');
+  const [selectedIssuerId, setSelectedIssuerId] = useState<'ramesh' | 'rajeeb' | 'other'>(
+    isUserRajeeb ? 'rajeeb' : 'ramesh'
+  );
+  const [billedByName, setBilledByName] = useState(initialPreset.name);
+  const [billedByTitle, setBilledByTitle] = useState(initialPreset.title);
+  const [billedByPhone, setBilledByPhone] = useState(initialPreset.phone);
+  const [billedByAddress, setBilledByAddress] = useState(initialPreset.address);
 
   // Client & Site State
   const [siteLocation, setSiteLocation] = useState('Nigdi Site');
@@ -177,12 +189,22 @@ export const CreateBillScreen: React.FC = () => {
         const presets = await getContractorPresets();
         setContractorPresets(presets);
         if (!editBillId) {
-          const ramesh = presets.find((p) => p.id === 'ramesh') || presets[0];
-          if (ramesh) {
-            setBilledByName(ramesh.name);
-            setBilledByTitle(ramesh.title);
-            setBilledByPhone(ramesh.phone);
-            setBilledByAddress(ramesh.address);
+          const isRajeeb = Boolean(
+            user?.name?.toLowerCase().includes('rajeeb') ||
+            user?.email?.toLowerCase().includes('rajeeb')
+          );
+          const targetId = isRajeeb ? 'rajeeb' : 'ramesh';
+          const matched =
+            presets.find((p) => p.id === targetId) ||
+            presets.find((p) => p.id === 'ramesh') ||
+            presets[0];
+
+          if (matched) {
+            setSelectedIssuerId(targetId);
+            setBilledByName(matched.name);
+            setBilledByTitle(matched.title);
+            setBilledByPhone(matched.phone);
+            setBilledByAddress(matched.address);
           }
         }
       } catch (err) {
@@ -190,7 +212,7 @@ export const CreateBillScreen: React.FC = () => {
       }
     };
     initPresets();
-  }, [editBillId]);
+  }, [editBillId, user]);
 
   const handleSelectIssuer = (id: 'ramesh' | 'rajeeb' | 'other') => {
     setSelectedIssuerId(id);

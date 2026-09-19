@@ -53,17 +53,28 @@ export const SettingsScreen: React.FC = () => {
         getContractorPresets(),
       ]);
       setPresets(loadedPresets);
-      setBusinessName(profile.businessName || 'RAMESH RAUT');
-      setOwnerName(profile.ownerName || 'Ramesh Raut');
-      setContractorTitle(profile.contractorTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR');
-      setPhone(profile.phone || '+91 9860980626');
-      setAddress(profile.address || 'Sus, Pune - 411021');
       setNoteFooter(profile.noteFooter || 'Thank you for your business!');
 
-      if (profile.ownerName?.toLowerCase().includes('rajeeb')) {
-        setActivePresetId('rajeeb');
+      const isUserRajeeb = Boolean(
+        user?.name?.toLowerCase().includes('rajeeb') ||
+        user?.email?.toLowerCase().includes('rajeeb')
+      );
+      const targetPresetId = isUserRajeeb ? 'rajeeb' : 'ramesh';
+      setActivePresetId(targetPresetId);
+
+      const activePreset = loadedPresets.find((p) => p.id === targetPresetId);
+      if (activePreset) {
+        setOwnerName(activePreset.name);
+        setBusinessName(activePreset.name.toUpperCase());
+        setContractorTitle(activePreset.title);
+        setPhone(activePreset.phone);
+        setAddress(activePreset.address);
       } else {
-        setActivePresetId('ramesh');
+        setBusinessName(profile.businessName || 'RAMESH RAUT');
+        setOwnerName(profile.ownerName || 'Ramesh Raut');
+        setContractorTitle(profile.contractorTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR');
+        setPhone(profile.phone || '+91 9860980626');
+        setAddress(profile.address || 'Sus, Pune - 411021');
       }
     } catch (error) {
       console.error(error);

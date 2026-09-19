@@ -189,7 +189,7 @@ export const LoginScreen: React.FC = () => {
 
             <CustomInput
               label="Email Address *"
-              placeholder="e.g. ramesh@siteflow.com"
+              placeholder="e.g. rajeebraut@gmail.com"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -235,22 +235,13 @@ export const LoginScreen: React.FC = () => {
               <View style={styles.demoSection}>
                 <View style={styles.demoDividerRow}>
                   <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR 1-TAP DEMO ACCESS</Text>
+                  <Text style={styles.dividerText}>OR 1-TAP REAL GMAIL DEMO</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
                 <View style={styles.demoChipsRow}>
                   <TouchableOpacity
-                    onPress={() => fillQuickDemo('ramesh@siteflow.com', 'pass123', 'Ramesh Raut')}
-                    style={styles.demoChip}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialIcons name="verified-user" size={15} color={COLORS.primary} />
-                    <Text style={styles.demoChipText}>Ramesh Raut</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => fillQuickDemo('rajeeb@siteflow.com', 'pass123', 'Rajeeb Raut')}
+                    onPress={() => fillQuickDemo('rajeebraut@gmail.com', 'pass123', 'Rajeeb Raut')}
                     style={styles.demoChip}
                     activeOpacity={0.7}
                   >
@@ -259,7 +250,16 @@ export const LoginScreen: React.FC = () => {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => fillQuickDemo('admin@siteflow.com', 'siteflow2026', 'SiteFlow Admin')}
+                    onPress={() => fillQuickDemo('rameshraut@gmail.com', 'pass123', 'Ramesh Raut')}
+                    style={styles.demoChip}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons name="verified-user" size={15} color={COLORS.primary} />
+                    <Text style={styles.demoChipText}>Ramesh Raut</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => fillQuickDemo('admin.siteflow@gmail.com', 'siteflow2026', 'SiteFlow Admin')}
                     style={styles.demoChip}
                     activeOpacity={0.7}
                   >

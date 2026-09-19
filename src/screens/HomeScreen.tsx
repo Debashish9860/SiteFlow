@@ -14,7 +14,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { Bill, BusinessProfile } from '../types/bill';
-import { getBills, getBusinessProfile } from '../services/storageService';
+import {
+  getBills,
+  getBusinessProfile,
+  getContractorPresets,
+  ContractorPreset,
+  DEFAULT_CONTRACTOR_PRESETS,
+} from '../services/storageService';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
@@ -147,6 +153,7 @@ export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [presets, setPresets] = useState<ContractorPreset[]>(DEFAULT_CONTRACTOR_PRESETS);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'invoice' | 'quotation'>('all');
 
@@ -202,12 +209,16 @@ export const HomeScreen: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [loadedBills, loadedProfile] = await Promise.all([
+      const [loadedBills, loadedProfile, loadedPresets] = await Promise.all([
         getBills(),
         getBusinessProfile(),
+        getContractorPresets(),
       ]);
       setBills(loadedBills);
       setProfile(loadedProfile);
+      if (loadedPresets && loadedPresets.length > 0) {
+        setPresets(loadedPresets);
+      }
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -220,6 +231,41 @@ export const HomeScreen: React.FC = () => {
       loadData();
     }, [])
   );
+
+  // Dynamic contractor determination based on logged-in user
+  const isRajeeb = Boolean(
+    user?.name?.toLowerCase().includes('rajeeb') ||
+    user?.email?.toLowerCase().includes('rajeeb')
+  );
+
+  const isRamesh = Boolean(
+    user?.name?.toLowerCase().includes('ramesh') ||
+    user?.email?.toLowerCase().includes('ramesh')
+  );
+
+  const currentPreset = isRajeeb
+    ? presets.find((p) => p.id === 'rajeeb')
+    : isRamesh
+    ? presets.find((p) => p.id === 'ramesh')
+    : null;
+
+  const displayContractorName =
+    currentPreset?.name ||
+    (isRajeeb
+      ? 'RAJEEB RAUT'
+      : isRamesh
+      ? 'RAMESH RAUT'
+      : (user?.name ? user.name.toUpperCase() : (profile?.ownerName?.toUpperCase() || 'RAMESH RAUT')));
+
+  const displayContractorTitle =
+    currentPreset?.title ||
+    profile?.contractorTitle ||
+    'PLUMBING & CIVIL WORKS CONTRACTOR';
+
+  const displayContractorPhone =
+    currentPreset?.phone ||
+    profile?.phone ||
+    '+91 9860980626';
 
   const invoices = bills.filter((b) => b.billType !== 'quotation');
   const quotations = bills.filter((b) => b.billType === 'quotation');
@@ -247,15 +293,23 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.proTagText}>SITEFLOW PRO</Text>
             </View>
             <Text style={styles.phoneSub}>
-              {user?.name ? `👤 ${user.name}` : `📞 ${profile?.phone || '+91 9860980626'}`}
+              📞 {displayContractorPhone}
             </Text>
           </View>
           <Text style={styles.businessTitle} numberOfLines={1}>
-            {profile?.ownerName || 'RAMESH RAUT'}
+            {displayContractorName}
           </Text>
           <Text style={styles.contractorSub}>
-            {profile?.contractorTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR'}
+            {displayContractorTitle}
           </Text>
+          {user?.email ? (
+            <View style={styles.accountPill}>
+              <MaterialIcons name="account-circle" size={13} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.accountPillText} numberOfLines={1}>
+                {user.email}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('Settings')}
@@ -520,6 +574,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
     marginTop: 2,
+  },
+  accountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 5,
+  },
+  accountPillText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '600',
   },
   settingsBtn: {
     padding: 10,
