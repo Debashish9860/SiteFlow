@@ -440,24 +440,8 @@ export const CreateBillScreen: React.FC = () => {
             {/* Billed In Name Of (Issuer) */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                  <MaterialIcons name="verified" size={20} color={COLORS.primary} />
-                  <Text style={styles.cardTitle}>Billed In Name Of</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowContractorEdit(!showContractorEdit)}
-                  style={styles.editContractorToggleBtn}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons
-                    name={showContractorEdit ? 'check' : 'edit'}
-                    size={15}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.editContractorToggleText}>
-                    {showContractorEdit ? 'Close' : 'Edit Details'}
-                  </Text>
-                </TouchableOpacity>
+                <MaterialIcons name="verified" size={20} color={COLORS.primary} />
+                <Text style={styles.cardTitle}>Billed In Name Of</Text>
               </View>
 
               <View style={styles.issuerChipsRow}>
@@ -516,7 +500,7 @@ export const CreateBillScreen: React.FC = () => {
                   activeOpacity={0.8}
                 >
                   <MaterialIcons
-                    name="edit"
+                    name="add-circle-outline"
                     size={16}
                     color={selectedIssuerId === 'other' ? '#FFF' : COLORS.textSecondary}
                   />
@@ -533,9 +517,18 @@ export const CreateBillScreen: React.FC = () => {
 
               {showContractorEdit || selectedIssuerId === 'other' ? (
                 <View style={styles.contractorEditBox}>
-                  <Text style={styles.contractorEditSectionTitle}>
-                    EDIT CONTRACTOR LETTERHEAD DETAILS:
-                  </Text>
+                  <View style={styles.contractorEditHeaderRow}>
+                    <Text style={styles.contractorEditSectionTitle}>
+                      EDIT CONTRACTOR LETTERHEAD DETAILS
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowContractorEdit(false)}
+                      style={styles.closeEditBtn}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons name="close" size={18} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                   <CustomInput
                     label="Contractor Name *"
                     placeholder="e.g. Ramesh Raut / Rajeeb Raut"
@@ -1044,34 +1037,28 @@ const styles = StyleSheet.create({
   issuerChipTextActive: {
     color: '#FFFFFF',
   },
-  editContractorToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#FDF2F4',
-    borderWidth: 1,
-    borderColor: '#F1D9DE',
-  },
-  editContractorToggleText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
   contractorEditBox: {
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.surfaceBorder,
   },
+  contractorEditHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   contractorEditSectionTitle: {
     fontSize: 11,
     fontWeight: '900',
     color: COLORS.primary,
     letterSpacing: 0.6,
-    marginBottom: 8,
+  },
+  closeEditBtn: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
   },
   saveDefaultRow: {
     flexDirection: 'row',
