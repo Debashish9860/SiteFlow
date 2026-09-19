@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bill, BusinessProfile, PaymentRecord } from '../types/bill';
 import { triggerBackgroundCloudSync } from './cloudSyncService';
+import { CompressedStorage } from './compressedStorage';
 
 const BILLS_KEY = '@billmaker_bills';
 const PROFILE_KEY = '@billmaker_profile';
@@ -19,9 +20,8 @@ const DEFAULT_PROFILE: BusinessProfile = {
 
 export async function getBills(): Promise<Bill[]> {
   try {
-    const data = await AsyncStorage.getItem(BILLS_KEY);
-    if (!data) return [];
-    const bills: Bill[] = JSON.parse(data);
+    const bills = await CompressedStorage.getItem<Bill[]>(BILLS_KEY);
+    if (!bills || !Array.isArray(bills)) return [];
     // ensure billType and billedBy exist for older records
     return bills
       .map((b) => ({
@@ -49,7 +49,7 @@ export async function saveBill(newBill: Bill): Promise<void> {
     } else {
       bills.unshift(newBill);
     }
-    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    await CompressedStorage.setItem(BILLS_KEY, bills);
     triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error saving bill:', error);
@@ -112,7 +112,7 @@ export async function registerBillPayment(
     };
 
     bills[billIndex] = updatedBill;
-    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    await CompressedStorage.setItem(BILLS_KEY, bills);
     triggerBackgroundCloudSync();
     return updatedBill;
   } catch (error) {
@@ -144,7 +144,7 @@ export async function updateBillPaymentStatus(
     };
 
     bills[billIndex] = updatedBill;
-    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(bills));
+    await CompressedStorage.setItem(BILLS_KEY, bills);
     triggerBackgroundCloudSync();
     return updatedBill;
   } catch (error) {
@@ -157,7 +157,7 @@ export async function deleteBill(billId: string): Promise<void> {
   try {
     const bills = await getBills();
     const updated = bills.filter((b) => b.id !== billId);
-    await AsyncStorage.setItem(BILLS_KEY, JSON.stringify(updated));
+    await CompressedStorage.setItem(BILLS_KEY, updated);
     triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error deleting bill:', error);
@@ -167,9 +167,9 @@ export async function deleteBill(billId: string): Promise<void> {
 
 export async function getBusinessProfile(): Promise<BusinessProfile> {
   try {
-    const data = await AsyncStorage.getItem(PROFILE_KEY);
-    if (!data) return DEFAULT_PROFILE;
-    return { ...DEFAULT_PROFILE, ...JSON.parse(data) };
+    const profile = await CompressedStorage.getItem<BusinessProfile>(PROFILE_KEY);
+    if (!profile) return DEFAULT_PROFILE;
+    return { ...DEFAULT_PROFILE, ...profile };
   } catch (error) {
     console.error('Error fetching profile:', error);
     return DEFAULT_PROFILE;
@@ -178,7 +178,7 @@ export async function getBusinessProfile(): Promise<BusinessProfile> {
 
 export async function saveBusinessProfile(profile: BusinessProfile): Promise<void> {
   try {
-    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    await CompressedStorage.setItem(PROFILE_KEY, profile);
     triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error saving profile:', error);
@@ -215,9 +215,8 @@ export const DEFAULT_CONTRACTOR_PRESETS: ContractorPreset[] = [
 
 export async function getContractorPresets(): Promise<ContractorPreset[]> {
   try {
-    const data = await AsyncStorage.getItem(CONTRACTOR_PRESETS_KEY);
-    if (!data) return DEFAULT_CONTRACTOR_PRESETS;
-    const list: ContractorPreset[] = JSON.parse(data);
+    const list = await CompressedStorage.getItem<ContractorPreset[]>(CONTRACTOR_PRESETS_KEY);
+    if (!list || !Array.isArray(list)) return DEFAULT_CONTRACTOR_PRESETS;
     const hasRamesh = list.some((p) => p.id === 'ramesh');
     const hasRajeeb = list.some((p) => p.id === 'rajeeb');
     const combined = [...list];
@@ -239,7 +238,7 @@ export async function saveContractorPreset(preset: ContractorPreset): Promise<vo
     } else {
       presets.push(preset);
     }
-    await AsyncStorage.setItem(CONTRACTOR_PRESETS_KEY, JSON.stringify(presets));
+    await CompressedStorage.setItem(CONTRACTOR_PRESETS_KEY, presets);
   } catch (error) {
     console.error('Error saving contractor preset:', error);
     throw error;

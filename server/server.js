@@ -117,17 +117,17 @@ app.post('/api/sync/backup', async (req, res) => {
 
     let upsertedBills = 0;
 
-    // 1. Upsert each bill
+    // 1. Upsert each bill into the shared company database
     if (Array.isArray(bills) && bills.length > 0) {
       for (const bill of bills) {
         if (!bill.id) continue;
         await billsCol.updateOne(
-          { _id: bill.id, userEmail },
+          { _id: bill.id },
           {
             $set: {
               ...bill,
               _id: bill.id,
-              userEmail,
+              lastSyncedBy: userEmail,
               syncedAt: new Date(),
             },
           },
@@ -139,14 +139,14 @@ app.post('/api/sync/backup', async (req, res) => {
 
     // 2. Upsert profile
     if (profile) {
-      const profileKey = userEmail !== 'default' ? userEmail : (profile.ownerName || 'default');
+      const profileKey = 'company_profile';
       await profilesCol.updateOne(
         { _id: profileKey },
         {
           $set: {
             ...profile,
             _id: profileKey,
-            userEmail,
+            lastUpdatedBy: userEmail,
             updatedAt: new Date(),
           },
         },
@@ -187,6 +187,56 @@ app.post('/api/sync/backup', async (req, res) => {
 });
 
 /**
+ * Two-way Sync & Merge endpoint
+ * Uploads local bills and returns all shared company bills from Atlas
+ * Allows Brother A and Brother B to instantly see each other's bills
+ */
+app.post('/api/sync/merge', async (req, res) => {
+  try {
+    const database = await connectToMongo();
+    const { userEmail = 'default', localBills = [] } = req.body;
+
+    const billsCol = database.collection('bills');
+
+    // Upsert local bills into Atlas
+    if (Array.isArray(localBills) && localBills.length > 0) {
+      for (const bill of localBills) {
+        if (!bill.id) continue;
+        await billsCol.updateOne(
+          { _id: bill.id },
+          {
+            $set: {
+              ...bill,
+              _id: bill.id,
+              lastSyncedBy: userEmail,
+              syncedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+      }
+    }
+
+    // Fetch all shared bills from Atlas
+    const allBills = await billsCol.find({}).sort({ createdAt: -1 }).toArray();
+    const cleanedBills = allBills.map(b => {
+      const { _id, ...rest } = b;
+      return { ...rest, id: rest.id || _id };
+    });
+
+    res.json({
+      success: true,
+      bills: cleanedBills,
+      totalCount: cleanedBills.length,
+      syncedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[Sync Merge Error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * Restore endpoint - Pulls latest data from MongoDB Atlas to restore mobile local storage
  */
 app.get('/api/sync/restore', async (req, res) => {
@@ -198,13 +248,13 @@ app.get('/api/sync/restore', async (req, res) => {
     const profilesCol = database.collection('profiles');
     const snapshotsCol = database.collection('backup_snapshots');
 
-    // 1. Try to get bills from bills collection
-    let bills = await billsCol.find({ userEmail }).toArray();
+    // 1. Fetch all shared company bills
+    let bills = await billsCol.find({}).sort({ createdAt: -1 }).toArray();
 
-    // If empty by userEmail, check if there are any documents or check latest snapshot
+    // If empty, check snapshots
     if (bills.length === 0) {
       const lastSnapshot = await snapshotsCol
-        .find({ userEmail })
+        .find({})
         .sort({ backupDate: -1 })
         .limit(1)
         .toArray();
@@ -220,8 +270,7 @@ app.get('/api/sync/restore', async (req, res) => {
     });
 
     // 2. Get profile
-    const profileKey = userEmail;
-    let profile = await profilesCol.findOne({ _id: profileKey });
+    let profile = await profilesCol.findOne({ _id: 'company_profile' });
     if (!profile) {
       profile = await profilesCol.findOne({});
     }

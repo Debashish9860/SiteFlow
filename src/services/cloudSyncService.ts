@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUser } from './authService';
 import { Bill, BusinessProfile } from '../types/bill';
+import { CompressedStorage } from './compressedStorage';
 
 const LAST_SYNC_KEY = '@siteflow_last_cloud_sync';
 const AUTO_SYNC_ENABLED_KEY = '@siteflow_auto_sync_enabled';
@@ -78,6 +79,91 @@ export async function checkCloudConnection(): Promise<CloudStatusResult> {
 }
 
 /**
+ * Two-way Sync & Merge across all team devices (e.g. Brother A & Brother B)
+ * - Uploads any local bills made on this phone
+ * - Retrieves all bills created on other phones/devices
+ * - Seamlessly merges and compresses data into local mobile storage
+ */
+export async function pullAndSyncTeamBills(): Promise<{
+  success: boolean;
+  billsCount: number;
+  message: string;
+}> {
+  try {
+    const endpoint = await getApiEndpoint();
+    const localBills = (await CompressedStorage.getItem<Bill[]>('@billmaker_bills')) || [];
+    const localProfile = await CompressedStorage.getItem<BusinessProfile>('@billmaker_profile');
+    const localPresets = (await CompressedStorage.getItem('@billmaker_contractor_presets')) || [];
+    const user = await getCurrentUser();
+    const userEmail = user?.email || 'default';
+
+    // 1. Try bidirectional merge endpoint
+    const res = await fetch(`${endpoint}/api/sync/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userEmail,
+        localBills,
+        profile: localProfile,
+        presets: localPresets,
+        deviceId: Platform.OS,
+      }),
+    });
+
+    if (!res.ok) {
+      // Fallback to standard backup
+      const backupRes = await syncAllToCloud();
+      return {
+        success: backupRes.success,
+        billsCount: backupRes.syncedCount,
+        message: backupRes.message,
+      };
+    }
+
+    const data = await res.json();
+    const cloudBills: Bill[] = data.bills || [];
+
+    // Intelligently merge: latest bill versions and payments
+    const billMap = new Map<string, Bill>();
+    for (const bill of localBills) {
+      billMap.set(bill.id, bill);
+    }
+
+    for (const cloudBill of cloudBills) {
+      const existing = billMap.get(cloudBill.id);
+      if (!existing) {
+        billMap.set(cloudBill.id, cloudBill);
+      } else {
+        const localPayCount = existing.paymentRecords?.length || 0;
+        const cloudPayCount = cloudBill.paymentRecords?.length || 0;
+        if (cloudPayCount > localPayCount || (cloudBill.isSettled && !existing.isSettled)) {
+          billMap.set(cloudBill.id, cloudBill);
+        }
+      }
+    }
+
+    const merged = Array.from(billMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+    await CompressedStorage.setItem('@billmaker_bills', merged);
+
+    const nowIso = new Date().toISOString();
+    await AsyncStorage.setItem(LAST_SYNC_KEY, nowIso);
+
+    return {
+      success: true,
+      billsCount: merged.length,
+      message: `Synchronized ${merged.length} company bills across all devices.`,
+    };
+  } catch (err: any) {
+    console.warn('[PullAndSync Error]', err);
+    return {
+      success: false,
+      billsCount: 0,
+      message: err?.message || 'Failed to sync with cloud.',
+    };
+  }
+}
+
+/**
  * Push all local data (bills, profiles, presets) to MongoDB Atlas
  */
 export async function syncAllToCloud(): Promise<{
@@ -87,12 +173,9 @@ export async function syncAllToCloud(): Promise<{
 }> {
   try {
     const endpoint = await getApiEndpoint();
-    const billsRaw = await AsyncStorage.getItem('@billmaker_bills');
-    const bills: Bill[] = billsRaw ? JSON.parse(billsRaw) : [];
-    const profileRaw = await AsyncStorage.getItem('@billmaker_profile');
-    const profile: BusinessProfile | null = profileRaw ? JSON.parse(profileRaw) : null;
-    const presetsRaw = await AsyncStorage.getItem('@billmaker_contractor_presets');
-    const presets = presetsRaw ? JSON.parse(presetsRaw) : [];
+    const bills = (await CompressedStorage.getItem<Bill[]>('@billmaker_bills')) || [];
+    const profile = await CompressedStorage.getItem<BusinessProfile>('@billmaker_profile');
+    const presets = (await CompressedStorage.getItem('@billmaker_contractor_presets')) || [];
     const user = await getCurrentUser();
     const userEmail = user?.email || 'default';
 
@@ -162,11 +245,11 @@ export async function restoreAllFromCloud(): Promise<{
     const cloudProfile: BusinessProfile | null = data.profile;
 
     if (cloudBills.length > 0) {
-      await AsyncStorage.setItem('@billmaker_bills', JSON.stringify(cloudBills));
+      await CompressedStorage.setItem('@billmaker_bills', cloudBills);
     }
 
     if (cloudProfile) {
-      await AsyncStorage.setItem('@billmaker_profile', JSON.stringify(cloudProfile));
+      await CompressedStorage.setItem('@billmaker_profile', cloudProfile);
     }
 
     const nowIso = new Date().toISOString();
@@ -224,7 +307,7 @@ export async function setAutoSyncEnabled(enabled: boolean): Promise<void> {
 let syncTimeout: any = null;
 
 /**
- * Non-blocking auto-sync trigger to keep Atlas up to date
+ * Non-blocking auto-sync trigger to keep Atlas and other devices up to date
  */
 export function triggerBackgroundCloudSync(): void {
   if (syncTimeout) clearTimeout(syncTimeout);
@@ -232,7 +315,7 @@ export function triggerBackgroundCloudSync(): void {
     try {
       const enabled = await isAutoSyncEnabled();
       if (!enabled) return;
-      await syncAllToCloud();
+      await pullAndSyncTeamBills();
       console.log('[CloudSync] Background sync to MongoDB Atlas completed.');
     } catch (e) {
       // Non-blocking, fails silently in background

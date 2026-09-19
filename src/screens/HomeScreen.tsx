@@ -23,7 +23,11 @@ import {
   ContractorPreset,
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
-import { syncAllToCloud, triggerBackgroundCloudSync } from '../services/cloudSyncService';
+import {
+  pullAndSyncTeamBills,
+  syncAllToCloud,
+  triggerBackgroundCloudSync,
+} from '../services/cloudSyncService';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BigButton } from '../components/BigButton';
@@ -181,11 +185,13 @@ export const HomeScreen: React.FC = () => {
   const handleQuickCloudSync = async () => {
     setSyncingCloud(true);
     try {
-      const res = await syncAllToCloud();
+      const res = await pullAndSyncTeamBills();
       if (res.success) {
+        const refreshed = await getBills();
+        setBills(refreshed);
         Alert.alert(
           'Cloud Synced ✓',
-          `All ${res.syncedCount} bills & receipts safely backed up to MongoDB Atlas Cluster0.`
+          `All ${res.billsCount} bills synchronized across all team devices with MongoDB Atlas.`
         );
       } else {
         Alert.alert('Cloud Sync Notice', res.message);
@@ -249,6 +255,7 @@ export const HomeScreen: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // 1. Instant local load from compressed storage
       const [loadedBills, loadedProfile, loadedPresets] = await Promise.all([
         getBills(),
         getBusinessProfile(),
@@ -259,7 +266,16 @@ export const HomeScreen: React.FC = () => {
       if (loadedPresets && loadedPresets.length > 0) {
         setPresets(loadedPresets);
       }
-      triggerBackgroundCloudSync();
+
+      // 2. Background cross-device sync: fetch bills created by brother on another phone
+      pullAndSyncTeamBills()
+        .then(async (res) => {
+          if (res.success) {
+            const updated = await getBills();
+            setBills(updated);
+          }
+        })
+        .catch(() => {});
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
