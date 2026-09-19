@@ -304,14 +304,9 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
                   <span class="site-title-underline">BILLED TO (CLIENT)</span>
                 </div>
                 <!-- Client Name in BOLD -->
-                <div style="font-size: 16px; font-weight: 800; color: #0F172A; text-transform: uppercase; margin-bottom: 2px;">
+                <div style="font-size: 16px; font-weight: 800; color: #0F172A; text-transform: uppercase; margin-bottom: 4px;">
                   ${bill.customerName}
                 </div>
-                ${
-                  bill.customerPhone
-                    ? `<div style="font-size: 12px; color: #475569; margin-bottom: 6px;">Phone: ${bill.customerPhone}</div>`
-                    : ''
-                }
                 <!-- Below client name, site name on the right side -->
                 <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px dashed #CBD5E1;">
                   <span style="font-size: 11px; font-weight: 700; color: #7C1034; text-transform: uppercase;">Site / Project:</span>

@@ -260,9 +260,6 @@ export const HomeScreen: React.FC = () => {
                     <Text style={styles.clientName}>
                       {item.customerName}
                     </Text>
-                    {item.customerPhone ? (
-                      <Text style={styles.customerSubPhone}>📞 {item.customerPhone}</Text>
-                    ) : null}
 
                     {/* Below client name, site name on the right side */}
                     <View style={styles.siteRowRight}>

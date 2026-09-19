@@ -10,7 +10,7 @@ import { COLORS } from './src/constants/theme';
 
 export type RootStackParamList = {
   Home: undefined;
-  CreateBill: undefined;
+  CreateBill: { editBillId?: string } | undefined;
   BillDetail: { billId: string };
   Settings: undefined;
 };
@@ -25,11 +25,11 @@ export default function App() {
         initialRouteName="Home"
         screenOptions={{
           headerStyle: {
-            backgroundColor: COLORS.primaryDark,
+            backgroundColor: COLORS.primary,
           },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: {
-            fontWeight: '700',
+            fontWeight: '800',
           },
           contentStyle: {
             backgroundColor: COLORS.background,
@@ -40,28 +40,28 @@ export default function App() {
           name="Home"
           component={HomeScreen}
           options={{
-            headerShown: false, // HomeScreen has custom branded header
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="CreateBill"
           component={CreateBillScreen}
-          options={{
-            title: 'नया बिल बनाएँ (New Bill)',
-          }}
+          options={({ route }) => ({
+            title: route.params?.editBillId ? 'Edit Bill / Quotation' : 'New Bill / Quotation',
+          })}
         />
         <Stack.Screen
           name="BillDetail"
           component={BillDetailScreen}
           options={{
-            title: 'बिल विवरण (Invoice Details)',
+            title: 'Bill Letterhead Preview',
           }}
         />
         <Stack.Screen
           name="Settings"
           component={SettingsScreen}
           options={{
-            title: 'बिज़नेस प्रोफाइल (Settings)',
+            title: 'Contractor Profile Settings',
           }}
         />
       </Stack.Navigator>

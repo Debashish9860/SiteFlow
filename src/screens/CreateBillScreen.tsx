@@ -12,7 +12,7 @@ import {
   TextInput,
   Animated,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { CustomInput } from '../components/CustomInput';
@@ -21,7 +21,7 @@ import { ItemQuickPickerModal } from '../components/ItemQuickPickerModal';
 import { Bill, BillItem, BillType } from '../types/bill';
 import { formatCurrency, getTodayDateString } from '../utils/formatters';
 import { numberToWordsIndian } from '../utils/numberToWords';
-import { saveBill } from '../services/storageService';
+import { saveBill, getBills } from '../services/storageService';
 import { STANDARD_UNITS } from '../data/presets';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -35,6 +35,8 @@ const POPULAR_PARTICULARS = [
 
 export const CreateBillScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute<any>();
+  const { editBillId } = route.params || {};
 
   // Bill Type
   const [billType, setBillType] = useState<BillType>('invoice');
@@ -50,8 +52,8 @@ export const CreateBillScreen: React.FC = () => {
   const [siteLocation, setSiteLocation] = useState('Nigdi Site');
   const [siteCity, setSiteCity] = useState('Pune, Maharashtra');
   const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
   const [billNumber, setBillNumber] = useState('');
+  const [editingCreatedAt, setEditingCreatedAt] = useState<number | null>(null);
 
   // Particular Entry State (Inline fast entry)
   const [particularName, setParticularName] = useState('');
@@ -90,10 +92,52 @@ export const CreateBillScreen: React.FC = () => {
     ]).start();
   }, []);
 
+  // Load existing bill data if editing
   useEffect(() => {
-    const initialNo = billType === 'quotation' ? 'QT-' + Math.floor(1000 + Math.random() * 9000) : '—';
-    setBillNumber(initialNo);
-  }, [billType]);
+    if (editBillId) {
+      loadBillToEdit(editBillId);
+    }
+  }, [editBillId]);
+
+  const loadBillToEdit = async (id: string) => {
+    try {
+      const bills = await getBills();
+      const existing = bills.find((b) => b.id === id);
+      if (existing) {
+        setBillType(existing.billType || 'invoice');
+        setCustomerName(existing.customerName || '');
+        setSiteLocation(existing.siteLocation || '');
+        setSiteCity(existing.siteCity || 'Pune, Maharashtra');
+        setBillNumber(existing.billNumber || '');
+        setItems(existing.items || []);
+        setDiscount(existing.discount ? existing.discount.toString() : '');
+        setAdvancePaid(existing.advancePaid ? existing.advancePaid.toString() : '');
+        setNotes(existing.notes || '');
+        setEditingCreatedAt(existing.createdAt || Date.now());
+
+        if (existing.billedBy?.toLowerCase().includes('ramesh')) {
+          setSelectedIssuerId('ramesh');
+        } else if (existing.billedBy?.toLowerCase().includes('rajeeb')) {
+          setSelectedIssuerId('rajeeb');
+        } else {
+          setSelectedIssuerId('other');
+        }
+        setBilledByName(existing.billedBy || 'RAMESH RAUT');
+        setBilledByTitle(existing.billedByTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR');
+        setBilledByPhone(existing.billedByPhone || '+91 9860980626');
+        setBilledByAddress(existing.billedByAddress || 'Sus, Pune - 411021');
+      }
+    } catch (err) {
+      console.error('Failed to load bill for editing:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!editBillId) {
+      const initialNo = billType === 'quotation' ? 'QT-' + Math.floor(1000 + Math.random() * 9000) : '—';
+      setBillNumber(initialNo);
+    }
+  }, [billType, editBillId]);
 
   // Pulse total when quantity or rate changes
   const qtyVal = parseFloat(particularQty) || 0;
@@ -214,7 +258,7 @@ export const CreateBillScreen: React.FC = () => {
     setIsSaving(true);
     try {
       const newBill: Bill = {
-        id: Date.now().toString(),
+        id: editBillId || Date.now().toString(),
         billNumber: billNumber.trim() || (billType === 'quotation' ? 'QT-' + Date.now().toString().slice(-4) : '—'),
         billType: billType,
         billedBy: billedByName.trim(),
@@ -222,8 +266,7 @@ export const CreateBillScreen: React.FC = () => {
         billedByPhone: billedByPhone.trim(),
         billedByAddress: billedByAddress.trim(),
         date: getTodayDateString(),
-        customerName: customerName.trim() || siteLocation.trim(),
-        customerPhone: customerPhone.trim() || undefined,
+        customerName: customerName.trim(),
         siteLocation: siteLocation.trim() || undefined,
         siteCity: siteCity.trim() || undefined,
         items: items,
@@ -232,7 +275,7 @@ export const CreateBillScreen: React.FC = () => {
         advancePaid: advanceNum,
         balanceDue: balanceDue,
         notes: notes.trim() || undefined,
-        createdAt: Date.now(),
+        createdAt: editingCreatedAt || Date.now(),
       };
 
       await saveBill(newBill);
@@ -462,27 +505,13 @@ export const CreateBillScreen: React.FC = () => {
                 iconName="location-city"
               />
 
-              <View style={styles.rowInputs}>
-                <View style={{ flex: 1.2 }}>
-                  <CustomInput
-                    label="Customer Phone"
-                    placeholder="e.g. 9876543210"
-                    value={customerPhone}
-                    onChangeText={setCustomerPhone}
-                    keyboardType="phone-pad"
-                    iconName="phone"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <CustomInput
-                    label={isQuotation ? 'Quotation No' : 'Bill No'}
-                    placeholder="e.g. —"
-                    value={billNumber}
-                    onChangeText={setBillNumber}
-                    iconName="tag"
-                  />
-                </View>
-              </View>
+              <CustomInput
+                label={isQuotation ? 'Quotation No' : 'Bill No'}
+                placeholder="e.g. —"
+                value={billNumber}
+                onChangeText={setBillNumber}
+                iconName="tag"
+              />
             </View>
 
             {/* SECTION: ADD PARTICULAR (Rate & Quantity) */}
@@ -729,11 +758,15 @@ export const CreateBillScreen: React.FC = () => {
             <View style={styles.submitWrap}>
               <BigButton
                 title={
-                  isQuotation
-                    ? `Generate Quotation for ${billedByName}`
-                    : `Save & View Bill for ${billedByName}`
+                  editBillId
+                    ? (isQuotation ? `Update Quotation for ${billedByName}` : `Update Bill for ${billedByName}`)
+                    : (isQuotation ? `Generate Quotation for ${billedByName}` : `Save & View Bill for ${billedByName}`)
                 }
-                subtitle="Creates letterhead matching DOC-20260905-WA0005.pdf"
+                subtitle={
+                  editBillId
+                    ? 'Saves your edits to the existing document'
+                    : 'Creates letterhead matching DOC-20260905-WA0005.pdf'
+                }
                 iconName="check-circle"
                 variant="primary"
                 loading={isSaving}

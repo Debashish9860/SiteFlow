@@ -131,16 +131,24 @@ export const BillDetailScreen: React.FC = () => {
 
           <View style={styles.secondaryActionRow}>
             <TouchableOpacity
+              onPress={() => navigation.navigate('CreateBill', { editBillId: bill.id })}
+              style={styles.editActionBtn}
+            >
+              <MaterialIcons name="edit" size={18} color={COLORS.primary} />
+              <Text style={styles.editActionText}>Edit Bill</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               onPress={handlePrint}
               disabled={isPrinting}
               style={styles.outlineActionBtn}
             >
-              <MaterialIcons name="print" size={20} color={COLORS.primary} />
-              <Text style={styles.outlineActionText}>Print / View PDF</Text>
+              <MaterialIcons name="print" size={18} color={COLORS.primary} />
+              <Text style={styles.outlineActionText}>Print / View</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleDelete} style={styles.deleteActionBtn}>
-              <MaterialIcons name="delete-outline" size={20} color={COLORS.danger} />
+              <MaterialIcons name="delete-outline" size={18} color={COLORS.danger} />
               <Text style={styles.deleteActionText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -174,9 +182,6 @@ export const BillDetailScreen: React.FC = () => {
               </View>
               {/* Client Name in BOLD */}
               <Text style={styles.clientNameBold}>{bill.customerName}</Text>
-              {bill.customerPhone ? (
-                <Text style={styles.clientPhoneText}>Phone: {bill.customerPhone}</Text>
-              ) : null}
 
               {/* Below client name, site name on the right side */}
               <View style={styles.siteRowBelow}>
@@ -347,6 +352,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   outlineActionText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  editActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#FDF2F4',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    gap: 6,
+  },
+  editActionText: {
     fontSize: FONT_SIZES.xs,
     fontWeight: '800',
     color: COLORS.primary,
