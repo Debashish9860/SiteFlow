@@ -21,7 +21,14 @@ import { ItemQuickPickerModal } from '../components/ItemQuickPickerModal';
 import { Bill, BillItem, BillType } from '../types/bill';
 import { formatCurrency, getTodayDateString } from '../utils/formatters';
 import { numberToWordsIndian } from '../utils/numberToWords';
-import { saveBill, getBills } from '../services/storageService';
+import {
+  saveBill,
+  getBills,
+  getContractorPresets,
+  saveContractorPreset,
+  ContractorPreset,
+  DEFAULT_CONTRACTOR_PRESETS,
+} from '../services/storageService';
 import { STANDARD_UNITS } from '../data/presets';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -41,7 +48,9 @@ export const CreateBillScreen: React.FC = () => {
   // Bill Type
   const [billType, setBillType] = useState<BillType>('invoice');
 
-  // Issuer State
+  // Issuer State & Presets
+  const [contractorPresets, setContractorPresets] = useState<ContractorPreset[]>(DEFAULT_CONTRACTOR_PRESETS);
+  const [showContractorEdit, setShowContractorEdit] = useState(false);
   const [selectedIssuerId, setSelectedIssuerId] = useState<'ramesh' | 'rajeeb' | 'other'>('ramesh');
   const [billedByName, setBilledByName] = useState('RAMESH RAUT');
   const [billedByTitle, setBilledByTitle] = useState('PLUMBING & CIVIL WORKS CONTRACTOR');
@@ -161,23 +170,71 @@ export const CreateBillScreen: React.FC = () => {
     }
   }, [particularQty, particularRate]);
 
+  // Load presets on launch
+  useEffect(() => {
+    const initPresets = async () => {
+      try {
+        const presets = await getContractorPresets();
+        setContractorPresets(presets);
+        if (!editBillId) {
+          const ramesh = presets.find((p) => p.id === 'ramesh') || presets[0];
+          if (ramesh) {
+            setBilledByName(ramesh.name);
+            setBilledByTitle(ramesh.title);
+            setBilledByPhone(ramesh.phone);
+            setBilledByAddress(ramesh.address);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load presets:', err);
+      }
+    };
+    initPresets();
+  }, [editBillId]);
+
   const handleSelectIssuer = (id: 'ramesh' | 'rajeeb' | 'other') => {
     setSelectedIssuerId(id);
-    if (id === 'ramesh') {
-      setBilledByName('RAMESH RAUT');
-      setBilledByPhone('+91 9860980626');
-      setBilledByAddress('Sus, Pune - 411021');
-      setBilledByTitle('PLUMBING & CIVIL WORKS CONTRACTOR');
-    } else if (id === 'rajeeb') {
-      setBilledByName('RAJEEB RAUT');
-      setBilledByPhone('+91 9860980626');
-      setBilledByAddress('Sus, Pune - 411021');
-      setBilledByTitle('PLUMBING & CIVIL WORKS CONTRACTOR');
-    } else {
+    if (id === 'other') {
+      setShowContractorEdit(true);
       setBilledByName('');
       setBilledByPhone('');
       setBilledByAddress('Pune, Maharashtra');
+    } else {
+      const found = contractorPresets.find((p) => p.id === id);
+      if (found) {
+        setBilledByName(found.name);
+        setBilledByPhone(found.phone);
+        setBilledByAddress(found.address);
+        setBilledByTitle(found.title);
+      }
     }
+  };
+
+  const handleSaveAsDefaultContractor = async () => {
+    if (!billedByName.trim()) {
+      Alert.alert('Missing Name', 'Please enter contractor name.');
+      return;
+    }
+    const presetId =
+      selectedIssuerId === 'rajeeb'
+        ? 'rajeeb'
+        : selectedIssuerId === 'ramesh'
+        ? 'ramesh'
+        : 'other';
+    const updated: ContractorPreset = {
+      id: presetId,
+      name: billedByName.trim().toUpperCase(),
+      title: billedByTitle.trim() || 'PLUMBING & CIVIL WORKS CONTRACTOR',
+      phone: billedByPhone.trim(),
+      address: billedByAddress.trim() || 'Sus, Pune - 411021',
+    };
+    await saveContractorPreset(updated);
+    const refreshed = await getContractorPresets();
+    setContractorPresets(refreshed);
+    Alert.alert(
+      'Default Saved',
+      `Saved default details for ${updated.name}! Future bills will automatically use this info.`
+    );
   };
 
   const handleAddInlineParticular = () => {
@@ -361,8 +418,24 @@ export const CreateBillScreen: React.FC = () => {
             {/* Billed In Name Of (Issuer) */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <MaterialIcons name="verified" size={20} color={COLORS.primary} />
-                <Text style={styles.cardTitle}>Billed In Name Of</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <MaterialIcons name="verified" size={20} color={COLORS.primary} />
+                  <Text style={styles.cardTitle}>Billed In Name Of</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowContractorEdit(!showContractorEdit)}
+                  style={styles.editContractorToggleBtn}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons
+                    name={showContractorEdit ? 'check' : 'edit'}
+                    size={15}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.editContractorToggleText}>
+                    {showContractorEdit ? 'Close' : 'Edit Details'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.issuerChipsRow}>
@@ -385,7 +458,7 @@ export const CreateBillScreen: React.FC = () => {
                       selectedIssuerId === 'ramesh' && styles.issuerChipTextActive,
                     ]}
                   >
-                    Ramesh Raut
+                    {contractorPresets.find((p) => p.id === 'ramesh')?.name || 'Ramesh Raut'}
                   </Text>
                 </TouchableOpacity>
 
@@ -408,7 +481,7 @@ export const CreateBillScreen: React.FC = () => {
                       selectedIssuerId === 'rajeeb' && styles.issuerChipTextActive,
                     ]}
                   >
-                    Rajeeb Raut
+                    {contractorPresets.find((p) => p.id === 'rajeeb')?.name || 'Rajeeb Raut'}
                   </Text>
                 </TouchableOpacity>
 
@@ -431,22 +504,32 @@ export const CreateBillScreen: React.FC = () => {
                       selectedIssuerId === 'other' && styles.issuerChipTextActive,
                     ]}
                   >
-                    + Other
+                    + Custom
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {selectedIssuerId === 'other' ? (
-                <View style={styles.otherInputsWrap}>
+              {showContractorEdit || selectedIssuerId === 'other' ? (
+                <View style={styles.contractorEditBox}>
+                  <Text style={styles.contractorEditSectionTitle}>
+                    EDIT CONTRACTOR LETTERHEAD DETAILS:
+                  </Text>
                   <CustomInput
                     label="Contractor Name *"
-                    placeholder="e.g. Sunil Raut"
+                    placeholder="e.g. Ramesh Raut / Rajeeb Raut"
                     value={billedByName}
                     onChangeText={setBilledByName}
                     iconName="business"
                   />
                   <CustomInput
-                    label="Phone Number"
+                    label="Business / Trade Title *"
+                    placeholder="e.g. PLUMBING & CIVIL WORKS CONTRACTOR"
+                    value={billedByTitle}
+                    onChangeText={setBilledByTitle}
+                    iconName="handyman"
+                  />
+                  <CustomInput
+                    label="Phone Number *"
                     placeholder="e.g. +91 9860980626"
                     value={billedByPhone}
                     onChangeText={setBilledByPhone}
@@ -454,20 +537,51 @@ export const CreateBillScreen: React.FC = () => {
                     iconName="phone"
                   />
                   <CustomInput
-                    label="Address"
+                    label="Office / Work Address"
                     placeholder="e.g. Sus, Pune - 411021"
                     value={billedByAddress}
                     onChangeText={setBilledByAddress}
                     iconName="location-on"
                   />
+
+                  <View style={styles.saveDefaultRow}>
+                    <TouchableOpacity
+                      onPress={handleSaveAsDefaultContractor}
+                      style={styles.saveDefaultBtn}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialIcons name="save" size={16} color={COLORS.primary} />
+                      <Text style={styles.saveDefaultBtnText}>
+                        Save as Default for {selectedIssuerId === 'rajeeb' ? 'Rajeeb' : 'Ramesh'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setShowContractorEdit(false)}
+                      style={styles.doneEditBtn}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.doneEditBtnText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.issuerPreviewBox}>
-                  <Text style={styles.issuerPreviewName}>{billedByName}</Text>
-                  <Text style={styles.issuerPreviewSub}>
-                    {billedByTitle} • {billedByPhone}
-                  </Text>
-                  <Text style={styles.issuerPreviewSub}>📍 {billedByAddress}</Text>
+                  <View style={styles.issuerPreviewRow}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={styles.issuerPreviewName}>{billedByName}</Text>
+                      <Text style={styles.issuerPreviewSub}>{billedByTitle}</Text>
+                      <Text style={styles.issuerPreviewSub}>📞 {billedByPhone}</Text>
+                      <Text style={styles.issuerPreviewSub}>📍 {billedByAddress}</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setShowContractorEdit(true)}
+                      style={styles.inlineEditBtn}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons name="edit" size={15} color={COLORS.primary} />
+                      <Text style={styles.inlineEditText}>Edit</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -908,18 +1022,100 @@ const styles = StyleSheet.create({
   issuerChipTextActive: {
     color: '#FFFFFF',
   },
-  otherInputsWrap: {
-    marginTop: 6,
-    paddingTop: 8,
+  editContractorToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FDF2F4',
+    borderWidth: 1,
+    borderColor: '#F1D9DE',
+  },
+  editContractorToggleText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  contractorEditBox: {
+    marginTop: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.surfaceBorder,
   },
+  contractorEditSectionTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.primary,
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
+  saveDefaultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  saveDefaultBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#FDF2F4',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  saveDefaultBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  doneEditBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneEditBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   issuerPreviewBox: {
     backgroundColor: COLORS.inputBg,
-    padding: 10,
-    borderRadius: 8,
-    borderLeftWidth: 3,
+    padding: 12,
+    borderRadius: 10,
+    borderLeftWidth: 4,
     borderLeftColor: COLORS.accent,
+  },
+  issuerPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inlineEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  inlineEditText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
   },
   issuerPreviewName: {
     fontSize: 13,

@@ -84,3 +84,63 @@ export async function saveBusinessProfile(profile: BusinessProfile): Promise<voi
     throw error;
   }
 }
+
+export interface ContractorPreset {
+  id: 'ramesh' | 'rajeeb' | string;
+  name: string;
+  title: string;
+  phone: string;
+  address: string;
+}
+
+const CONTRACTOR_PRESETS_KEY = '@billmaker_contractor_presets';
+
+export const DEFAULT_CONTRACTOR_PRESETS: ContractorPreset[] = [
+  {
+    id: 'ramesh',
+    name: 'RAMESH RAUT',
+    title: 'PLUMBING & CIVIL WORKS CONTRACTOR',
+    phone: '+91 9860980626',
+    address: 'Sus, Pune - 411021',
+  },
+  {
+    id: 'rajeeb',
+    name: 'RAJEEB RAUT',
+    title: 'PLUMBING & CIVIL WORKS CONTRACTOR',
+    phone: '+91 9860980626',
+    address: 'Sus, Pune - 411021',
+  },
+];
+
+export async function getContractorPresets(): Promise<ContractorPreset[]> {
+  try {
+    const data = await AsyncStorage.getItem(CONTRACTOR_PRESETS_KEY);
+    if (!data) return DEFAULT_CONTRACTOR_PRESETS;
+    const list: ContractorPreset[] = JSON.parse(data);
+    const hasRamesh = list.some((p) => p.id === 'ramesh');
+    const hasRajeeb = list.some((p) => p.id === 'rajeeb');
+    const combined = [...list];
+    if (!hasRamesh) combined.unshift(DEFAULT_CONTRACTOR_PRESETS[0]);
+    if (!hasRajeeb) combined.push(DEFAULT_CONTRACTOR_PRESETS[1]);
+    return combined;
+  } catch (error) {
+    console.error('Error fetching contractor presets:', error);
+    return DEFAULT_CONTRACTOR_PRESETS;
+  }
+}
+
+export async function saveContractorPreset(preset: ContractorPreset): Promise<void> {
+  try {
+    const presets = await getContractorPresets();
+    const idx = presets.findIndex((p) => p.id === preset.id);
+    if (idx >= 0) {
+      presets[idx] = preset;
+    } else {
+      presets.push(preset);
+    }
+    await AsyncStorage.setItem(CONTRACTOR_PRESETS_KEY, JSON.stringify(presets));
+  } catch (error) {
+    console.error('Error saving contractor preset:', error);
+    throw error;
+  }
+}

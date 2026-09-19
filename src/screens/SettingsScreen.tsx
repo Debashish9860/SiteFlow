@@ -15,13 +15,23 @@ import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { CustomInput } from '../components/CustomInput';
 import { BigButton } from '../components/BigButton';
 import { BusinessProfile } from '../types/bill';
-import { getBusinessProfile, saveBusinessProfile } from '../services/storageService';
+import {
+  getBusinessProfile,
+  saveBusinessProfile,
+  getContractorPresets,
+  saveContractorPreset,
+  ContractorPreset,
+  DEFAULT_CONTRACTOR_PRESETS,
+} from '../services/storageService';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [presets, setPresets] = useState<ContractorPreset[]>(DEFAULT_CONTRACTOR_PRESETS);
+  const [activePresetId, setActivePresetId] = useState<'ramesh' | 'rajeeb' | 'custom'>('ramesh');
 
   const [businessName, setBusinessName] = useState('RAMESH RAUT');
   const [ownerName, setOwnerName] = useState('Ramesh Raut');
@@ -36,13 +46,23 @@ export const SettingsScreen: React.FC = () => {
 
   const loadProfile = async () => {
     try {
-      const profile = await getBusinessProfile();
+      const [profile, loadedPresets] = await Promise.all([
+        getBusinessProfile(),
+        getContractorPresets(),
+      ]);
+      setPresets(loadedPresets);
       setBusinessName(profile.businessName || 'RAMESH RAUT');
       setOwnerName(profile.ownerName || 'Ramesh Raut');
       setContractorTitle(profile.contractorTitle || 'PLUMBING & CIVIL WORKS CONTRACTOR');
       setPhone(profile.phone || '+91 9860980626');
       setAddress(profile.address || 'Sus, Pune - 411021');
       setNoteFooter(profile.noteFooter || 'Thank you for your business!');
+
+      if (profile.ownerName?.toLowerCase().includes('rajeeb')) {
+        setActivePresetId('rajeeb');
+      } else {
+        setActivePresetId('ramesh');
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -50,12 +70,16 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
-  const applyPreset = (name: 'Ramesh Raut' | 'Rajeeb Raut') => {
-    setOwnerName(name);
-    setBusinessName(name.toUpperCase());
-    setContractorTitle('PLUMBING & CIVIL WORKS CONTRACTOR');
-    setPhone('+91 9860980626');
-    setAddress('Sus, Pune - 411021');
+  const applyPreset = (presetId: 'ramesh' | 'rajeeb') => {
+    setActivePresetId(presetId);
+    const found = presets.find((p) => p.id === presetId);
+    if (found) {
+      setOwnerName(found.name);
+      setBusinessName(found.name.toUpperCase());
+      setContractorTitle(found.title);
+      setPhone(found.phone);
+      setAddress(found.address);
+    }
   };
 
   const handleSave = async () => {
@@ -76,7 +100,22 @@ export const SettingsScreen: React.FC = () => {
       };
 
       await saveBusinessProfile(updatedProfile);
-      Alert.alert('Saved', 'Contractor Profile updated successfully!', [
+
+      // Also persist to this contractor's preset
+      const presetId = activePresetId === 'rajeeb' ? 'rajeeb' : 'ramesh';
+      const updatedPreset: ContractorPreset = {
+        id: presetId,
+        name: ownerName.trim(),
+        title: contractorTitle.trim() || 'PLUMBING & CIVIL WORKS CONTRACTOR',
+        phone: phone.trim(),
+        address: address.trim() || 'Sus, Pune - 411021',
+      };
+      await saveContractorPreset(updatedPreset);
+
+      const refreshed = await getContractorPresets();
+      setPresets(refreshed);
+
+      Alert.alert('Saved', `${updatedPreset.name}'s details saved successfully!`, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
@@ -99,49 +138,49 @@ export const SettingsScreen: React.FC = () => {
         >
           {/* Quick Preset Selector */}
           <View style={styles.presetSwitchBox}>
-            <Text style={styles.presetLabel}>QUICK CONTRACTOR PRESET:</Text>
+            <Text style={styles.presetLabel}>CHOOSE CONTRACTOR PROFILE TO EDIT:</Text>
             <View style={styles.presetBtnRow}>
               <TouchableOpacity
-                onPress={() => applyPreset('Ramesh Raut')}
+                onPress={() => applyPreset('ramesh')}
                 style={[
                   styles.presetBtn,
-                  ownerName.toLowerCase().includes('ramesh') && styles.presetBtnActive,
+                  activePresetId === 'ramesh' && styles.presetBtnActive,
                 ]}
               >
                 <MaterialIcons
                   name="person"
                   size={18}
-                  color={ownerName.toLowerCase().includes('ramesh') ? '#FFF' : COLORS.textPrimary}
+                  color={activePresetId === 'ramesh' ? '#FFF' : COLORS.textPrimary}
                 />
                 <Text
                   style={[
                     styles.presetBtnText,
-                    ownerName.toLowerCase().includes('ramesh') && styles.presetBtnTextActive,
+                    activePresetId === 'ramesh' && styles.presetBtnTextActive,
                   ]}
                 >
-                  Ramesh Raut
+                  {presets.find((p) => p.id === 'ramesh')?.name || 'Ramesh Raut'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => applyPreset('Rajeeb Raut')}
+                onPress={() => applyPreset('rajeeb')}
                 style={[
                   styles.presetBtn,
-                  ownerName.toLowerCase().includes('rajeeb') && styles.presetBtnActive,
+                  activePresetId === 'rajeeb' && styles.presetBtnActive,
                 ]}
               >
                 <MaterialIcons
                   name="person"
                   size={18}
-                  color={ownerName.toLowerCase().includes('rajeeb') ? '#FFF' : COLORS.textPrimary}
+                  color={activePresetId === 'rajeeb' ? '#FFF' : COLORS.textPrimary}
                 />
                 <Text
                   style={[
                     styles.presetBtnText,
-                    ownerName.toLowerCase().includes('rajeeb') && styles.presetBtnTextActive,
+                    activePresetId === 'rajeeb' && styles.presetBtnTextActive,
                   ]}
                 >
-                  Rajeeb Raut
+                  {presets.find((p) => p.id === 'rajeeb')?.name || 'Rajeeb Raut'}
                 </Text>
               </TouchableOpacity>
             </View>
