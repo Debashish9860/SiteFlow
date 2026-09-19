@@ -316,7 +316,7 @@ export const HomeScreen: React.FC = () => {
           style={styles.settingsBtn}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="tune" size={24} color="#FFF" />
+          <MaterialIcons name="settings" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
