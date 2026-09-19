@@ -77,8 +77,8 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
           }
           @page {
-            size: A4;
-            margin: 0;
+            size: A4 portrait;
+            margin: 12mm 15mm;
           }
           body {
             margin: 0;
@@ -91,10 +91,10 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
             print-color-adjust: exact;
           }
           .page-container {
-            padding: 40px;
-            max-width: 820px;
+            width: 100%;
+            max-width: 210mm;
+            min-height: 270mm;
             margin: 0 auto;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -372,6 +372,8 @@ export async function createPdfFile(bill: Bill, profile: BusinessProfile): Promi
   const html = generateInvoiceHtml(bill, profile);
   const { uri } = await Print.printToFileAsync({
     html,
+    width: 595,
+    height: 842,
     base64: false,
   });
   return uri;

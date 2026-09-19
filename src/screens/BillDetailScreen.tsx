@@ -14,6 +14,7 @@ import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
 import { Bill, BusinessProfile } from '../types/bill';
 import { getBills, getBusinessProfile, deleteBill } from '../services/storageService';
 import { sharePdf, printDirectly } from '../services/pdfService';
+import { exportBillToExcel } from '../services/excelService';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { numberToWordsIndian } from '../utils/numberToWords';
 import { BigButton } from '../components/BigButton';
@@ -29,6 +30,7 @@ export const BillDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSharing, setIsSharing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   useEffect(() => {
     loadBillDetails();
@@ -70,6 +72,18 @@ export const BillDetailScreen: React.FC = () => {
       Alert.alert('Print Failed', error?.message || 'Could not print PDF');
     } finally {
       setIsPrinting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!bill || !profile) return;
+    setIsExportingExcel(true);
+    try {
+      await exportBillToExcel(bill, profile);
+    } catch (error: any) {
+      Alert.alert('Excel Export Failed', error?.message || 'Could not export to Excel');
+    } finally {
+      setIsExportingExcel(false);
     }
   };
 
@@ -121,30 +135,47 @@ export const BillDetailScreen: React.FC = () => {
         {/* Top Action Buttons */}
         <View style={styles.topActionsCard}>
           <BigButton
-            title="Share PDF via WhatsApp"
-            subtitle="Send high-resolution letterhead PDF to client"
-            iconName="share"
+            title="Print / Save A4 PDF"
+            subtitle="Standard A4 contractor letterhead"
+            iconName="picture-as-pdf"
+            variant="primary"
+            loading={isPrinting}
+            onPress={handlePrint}
+            style={{ marginBottom: 10 }}
+          />
+
+          <BigButton
+            title="Export to Excel (.xlsx)"
+            subtitle="Contractor letterhead spreadsheet format"
+            iconName="table-view"
             variant="success"
-            loading={isSharing}
-            onPress={handleShare}
+            loading={isExportingExcel}
+            onPress={handleExportExcel}
+            style={{ marginBottom: 4 }}
           />
 
           <View style={styles.secondaryActionRow}>
+            <TouchableOpacity
+              onPress={handleShare}
+              disabled={isSharing}
+              style={styles.outlineActionBtn}
+            >
+              {isSharing ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <>
+                  <MaterialIcons name="share" size={18} color={COLORS.primary} />
+                  <Text style={styles.outlineActionText}>Share PDF</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => navigation.navigate('CreateBill', { editBillId: bill.id })}
               style={styles.editActionBtn}
             >
               <MaterialIcons name="edit" size={18} color={COLORS.primary} />
               <Text style={styles.editActionText}>Edit Bill</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handlePrint}
-              disabled={isPrinting}
-              style={styles.outlineActionBtn}
-            >
-              <MaterialIcons name="print" size={18} color={COLORS.primary} />
-              <Text style={styles.outlineActionText}>Print / View</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleDelete} style={styles.deleteActionBtn}>
