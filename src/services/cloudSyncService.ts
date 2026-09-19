@@ -208,7 +208,7 @@ export async function syncAllToCloud(): Promise<{
     return {
       success: true,
       syncedCount: bills.length,
-      message: `Successfully backed up ${bills.length} bills to MongoDB Atlas.`,
+      message: `Successfully backed up ${bills.length} bills to secure cloud storage.`,
     };
   } catch (err: any) {
     console.warn('[CloudSync Error]', err);
@@ -258,7 +258,7 @@ export async function restoreAllFromCloud(): Promise<{
     return {
       success: true,
       billsRestored: cloudBills.length,
-      message: `Restored ${cloudBills.length} bills and contractor profile from MongoDB Atlas.`,
+      message: `Restored ${cloudBills.length} bills and contractor profile from secure cloud storage.`,
     };
   } catch (err: any) {
     console.error('[CloudRestore Error]', err);

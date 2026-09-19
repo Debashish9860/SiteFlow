@@ -23,7 +23,7 @@ export const SyncSuccessToast: React.FC<SyncSuccessToastProps> = ({
   visible,
   onClose,
   title = 'Data Sync Done!',
-  subtitle = 'All bills & payments are synchronized with MongoDB Atlas.',
+  subtitle = 'All bills & payments are synchronized with secure cloud backup.',
   syncedCount,
 }) => {
   // Animation values
@@ -167,10 +167,10 @@ export const SyncSuccessToast: React.FC<SyncSuccessToastProps> = ({
                   : subtitle}
               </Text>
 
-              {/* Database Cluster Tag */}
+              {/* Cloud Sync Status Tag */}
               <View style={styles.clusterPill}>
                 <View style={styles.greenDot} />
-                <Text style={styles.clusterPillText}>MongoDB Atlas • Cluster0 Connected</Text>
+                <Text style={styles.clusterPillText}>Secure Cloud • Synced & Connected</Text>
               </View>
 
               {/* Quick Dismiss Button */}

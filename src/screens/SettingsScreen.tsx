@@ -54,7 +54,7 @@ export const SettingsScreen: React.FC = () => {
   const [address, setAddress] = useState('Sus, Pune - 411021');
   const [noteFooter, setNoteFooter] = useState('Thank you for your business!');
 
-  // MongoDB Atlas Cloud Sync State
+  // Cloud Sync State
   const [cloudStatus, setCloudStatus] = useState<CloudStatusResult>({ connected: false });
   const [lastSyncText, setLastSyncText] = useState<string>('Never');
   const [syncingCloud, setSyncingCloud] = useState(false);
@@ -64,7 +64,7 @@ export const SettingsScreen: React.FC = () => {
   // Sync Success Toast State
   const [showSyncToast, setShowSyncToast] = useState(false);
   const [syncToastTitle, setSyncToastTitle] = useState('Data Sync Done!');
-  const [syncToastSubtitle, setSyncToastSubtitle] = useState('All bills & profile safely synced to MongoDB Atlas.');
+  const [syncToastSubtitle, setSyncToastSubtitle] = useState('All bills & profile safely synced to secure cloud.');
   const [syncToastCount, setSyncToastCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export const SettingsScreen: React.FC = () => {
       const result = await syncAllToCloud();
       if (result.success) {
         setSyncToastTitle('Data Sync Done!');
-        setSyncToastSubtitle('All bills and company profile safely backed up to MongoDB Atlas Cluster0.');
+        setSyncToastSubtitle('All bills and company profile safely backed up to secure cloud storage.');
         setSyncToastCount(result.syncedCount);
         setShowSyncToast(true);
         await loadCloudSyncState();
@@ -117,8 +117,8 @@ export const SettingsScreen: React.FC = () => {
 
   const handleRestoreFromCloud = async () => {
     Alert.alert(
-      'Restore from MongoDB Atlas?',
-      'This will retrieve all bills, quotations, and profile settings from your MongoDB Atlas cloud database. Continue?',
+      'Restore from Cloud Backup?',
+      'This will retrieve all bills, quotations, and profile settings from your secure cloud storage. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -130,7 +130,7 @@ export const SettingsScreen: React.FC = () => {
               const res = await restoreAllFromCloud();
               if (res.success) {
                 setSyncToastTitle('Cloud Restore Done!');
-                setSyncToastSubtitle('All company bills & profile successfully recovered from MongoDB Atlas.');
+                setSyncToastSubtitle('All company bills & profile successfully recovered from secure cloud storage.');
                 setSyncToastCount(res.billsRestored);
                 setShowSyncToast(true);
                 await loadProfile();
@@ -381,16 +381,16 @@ export const SettingsScreen: React.FC = () => {
             />
           </View>
 
-          {/* MongoDB Atlas Cloud Database & Backup Card */}
+          {/* Secure Cloud Backup & Sync Card */}
           <View style={styles.cloudCard}>
             <View style={styles.cloudHeader}>
               <View style={styles.cloudIconBadge}>
                 <MaterialIcons name="cloud-done" size={22} color="#FFFFFF" />
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={styles.cloudTitle}>MONGODB ATLAS CLOUD BACKUP</Text>
+                <Text style={styles.cloudTitle}>SECURE CLOUD BACKUP & SYNC</Text>
                 <Text style={styles.cloudSub}>
-                  Cluster0 • siteflow_db (orqhcqp.mongodb.net)
+                  Automatic Real-Time Multi-Device Synchronization
                 </Text>
               </View>
               <View
@@ -412,7 +412,7 @@ export const SettingsScreen: React.FC = () => {
             </View>
 
             <Text style={styles.cloudDesc}>
-              All contractor bills, payment receipts, and business profile details are safely backed up to MongoDB Atlas. Even if local storage is reset or you switch devices, you can retrieve your data anytime.
+              All contractor bills, payment receipts, and business profile details are safely backed up to your secure cloud storage. Even if you switch devices or reset the app, you can retrieve your data anytime.
             </Text>
 
             <View style={styles.cloudStatsRow}>
@@ -422,9 +422,9 @@ export const SettingsScreen: React.FC = () => {
               </View>
               <View style={styles.cloudStatDivider} />
               <View style={styles.cloudStatBox}>
-                <Text style={styles.cloudStatLabel}>DATABASE CLUSTER</Text>
+                <Text style={styles.cloudStatLabel}>STORAGE TYPE</Text>
                 <Text style={[styles.cloudStatValue, { color: '#0F172A', fontWeight: '800' }]}>
-                  MongoDB Atlas
+                  Secure Cloud
                 </Text>
               </View>
             </View>
@@ -458,7 +458,7 @@ export const SettingsScreen: React.FC = () => {
                 ) : (
                   <>
                     <MaterialIcons name="cloud-upload" size={18} color="#FFFFFF" />
-                    <Text style={styles.cloudBtnText}>Backup Now to Atlas</Text>
+                    <Text style={styles.cloudBtnText}>Backup Now to Cloud</Text>
                   </>
                 )}
               </TouchableOpacity>

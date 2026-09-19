@@ -629,7 +629,7 @@ export const HomeScreen: React.FC = () => {
         visible={showSyncSuccess}
         onClose={() => setShowSyncSuccess(false)}
         title="Data Sync Done!"
-        subtitle="All bills & payments are synchronized with MongoDB Atlas."
+        subtitle="All bills & payments are synchronized with your secure cloud storage."
         syncedCount={syncCount}
       />
     </SafeAreaView>
