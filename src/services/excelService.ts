@@ -67,12 +67,15 @@ export async function exportBillToExcel(bill: Bill, profile: BusinessProfile): P
   // Totals & Words
   rows.push([]);
   rows.push(['TOTAL AMOUNT IN WORDS:', words, '', '', 'GRAND TOTAL (₹):', totalAmount]);
-  if (!isQuotation && (bill.discount > 0 || bill.advancePaid > 0)) {
+  if (!isQuotation && (bill.discount > 0 || bill.advancePaid > 0 || (bill.taxDeducted || 0) > 0)) {
     if (bill.discount > 0) {
       rows.push(['', '', '', '', 'DISCOUNT (₹):', bill.discount]);
     }
     if (bill.advancePaid > 0) {
-      rows.push(['', '', '', '', 'AMOUNT RECEIVED (₹):', bill.advancePaid]);
+      rows.push(['', '', '', '', 'ACTUAL RECEIVED (₹):', bill.advancePaid]);
+    }
+    if ((bill.taxDeducted || 0) > 0) {
+      rows.push(['', '', '', '', `TAX / TDS DEDUCTED (${bill.settlementReason || 'Tax'}):`, bill.taxDeducted]);
     }
     rows.push([
       '',
@@ -80,7 +83,11 @@ export async function exportBillToExcel(bill: Bill, profile: BusinessProfile): P
       '',
       '',
       bill.balanceDue === 0 ? 'STATUS:' : 'BALANCE DUE (₹):',
-      bill.balanceDue === 0 ? 'FULLY PAID ✓' : bill.balanceDue,
+      bill.balanceDue === 0
+        ? bill.isSettled || (bill.taxDeducted || 0) > 0
+          ? 'FULLY SETTLED & PAID ✓'
+          : 'FULLY PAID ✓'
+        : bill.balanceDue,
     ]);
   }
 

@@ -204,7 +204,7 @@ export const BillDetailScreen: React.FC = () => {
             <View
               style={[
                 styles.paymentStatusPill,
-                bill.balanceDue === 0
+                bill.balanceDue === 0 || bill.isSettled
                   ? styles.paymentStatusPaid
                   : (bill.advancePaid || 0) > 0
                   ? styles.paymentStatusPartial
@@ -212,13 +212,15 @@ export const BillDetailScreen: React.FC = () => {
               ]}
             >
               <MaterialIcons
-                name={bill.balanceDue === 0 ? 'check-circle' : 'pending'}
+                name={bill.balanceDue === 0 || bill.isSettled ? 'check-circle' : 'pending'}
                 size={13}
                 color="#FFFFFF"
               />
               <Text style={styles.paymentStatusText}>
-                {bill.balanceDue === 0
-                  ? 'FULLY PAID'
+                {bill.balanceDue === 0 || bill.isSettled
+                  ? bill.taxDeducted
+                    ? 'SETTLED (TAX/TDS)'
+                    : 'FULLY PAID'
                   : (bill.advancePaid || 0) > 0
                   ? 'PARTIALLY PAID'
                   : 'PENDING'}
@@ -234,21 +236,30 @@ export const BillDetailScreen: React.FC = () => {
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.paymentMetricBox}>
-              <Text style={styles.metricLabel}>RECEIVED</Text>
-              <Text style={[styles.metricValue, { color: COLORS.success }]}>
+              <Text style={styles.metricLabel}>ACTUAL RECEIVED</Text>
+              <Text style={[styles.metricValue, { color: COLORS.success, fontWeight: '900' }]}>
                 {formatCurrency(bill.advancePaid || 0)}
               </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.paymentMetricBox}>
-              <Text style={styles.metricLabel}>BALANCE DUE</Text>
+              <Text style={styles.metricLabel}>
+                {bill.taxDeducted ? 'DUE / TAX' : 'BALANCE DUE'}
+              </Text>
               <Text
                 style={[
                   styles.metricValue,
-                  { color: bill.balanceDue === 0 ? COLORS.success : COLORS.primary, fontWeight: '900' },
+                  {
+                    color: bill.balanceDue === 0 ? COLORS.success : COLORS.primary,
+                    fontWeight: '900',
+                  },
                 ]}
               >
-                {bill.balanceDue === 0 ? '₹ 0 (Paid)' : formatCurrency(bill.balanceDue)}
+                {bill.balanceDue === 0
+                  ? bill.taxDeducted
+                    ? 'Settled (Tax)'
+                    : '₹ 0 (Paid)'
+                  : formatCurrency(bill.balanceDue)}
               </Text>
             </View>
           </View>
@@ -451,15 +462,25 @@ export const BillDetailScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* If payment received, show on letterhead */}
-            {(bill.advancePaid || 0) > 0 && (
+            {/* If payment received or tax deducted, show on letterhead */}
+            {((bill.advancePaid || 0) > 0 || (bill.taxDeducted || 0) > 0) && (
               <View style={styles.letterheadPaymentBox}>
                 <View style={styles.letterheadPaymentRow}>
-                  <Text style={styles.letterheadPayLabel}>Amount Received / Paid:</Text>
-                  <Text style={styles.letterheadPayVal}>
+                  <Text style={styles.letterheadPayLabel}>Actual Amount Received:</Text>
+                  <Text style={[styles.letterheadPayVal, { color: COLORS.success, fontWeight: '800' }]}>
                     ₹ {(bill.advancePaid || 0).toLocaleString('en-IN')}/-
                   </Text>
                 </View>
+                {(bill.taxDeducted || 0) > 0 && (
+                  <View style={styles.letterheadPaymentRow}>
+                    <Text style={styles.letterheadPayLabel}>
+                      Tax / TDS Deducted ({bill.settlementReason || 'Tax'}):
+                    </Text>
+                    <Text style={styles.letterheadPayVal}>
+                      ₹ {(bill.taxDeducted || 0).toLocaleString('en-IN')}/-
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.letterheadPaymentRow}>
                   <Text style={styles.letterheadPayLabel}>
                     {bill.balanceDue === 0 ? 'Status:' : 'Balance Due:'}
@@ -471,7 +492,7 @@ export const BillDetailScreen: React.FC = () => {
                     ]}
                   >
                     {bill.balanceDue === 0
-                      ? 'FULLY PAID ✓'
+                      ? 'FULLY SETTLED & PAID ✓'
                       : `₹ ${bill.balanceDue.toLocaleString('en-IN')}/-`}
                   </Text>
                 </View>

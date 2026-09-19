@@ -46,6 +46,8 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
   const [amountStr, setAmountStr] = useState('');
   const [selectedMode, setSelectedMode] = useState<string>('Cash');
   const [note, setNote] = useState('');
+  const [markAsSettled, setMarkAsSettled] = useState(false);
+  const [settlementReason, setSettlementReason] = useState('TDS / Tax Deduction');
   const [isSaving, setIsSaving] = useState(false);
 
   // Initialize or reset amount when modal opens
@@ -54,6 +56,8 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
       setAmountStr(currentDue.toString());
       setNote('');
       setSelectedMode('Cash');
+      setMarkAsSettled(false);
+      setSettlementReason('TDS / Tax Deduction');
     }
   }, [visible, bill?.id, currentDue]);
 
@@ -61,8 +65,14 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
   const remainingAfterPayment = Math.max(0, currentDue - numericAmount);
   const isFullPayment = numericAmount >= currentDue && currentDue > 0;
 
-  const handleApplyPreset = (presetAmount: number) => {
+  const handleApplyPreset = (presetAmount: number, isTds?: boolean) => {
     setAmountStr(Math.round(presetAmount).toString());
+    if (isTds) {
+      setMarkAsSettled(true);
+      setSettlementReason('TDS / Tax Deduction');
+    } else {
+      setMarkAsSettled(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -92,12 +102,19 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
   const processPayment = async (amount: number) => {
     setIsSaving(true);
     try {
-      const updated = await registerBillPayment(bill.id, amount, selectedMode, note);
+      const taxAmount = markAsSettled ? remainingAfterPayment : 0;
+      const updated = await registerBillPayment(bill.id, amount, selectedMode, note, {
+        taxDeducted: taxAmount,
+        markAsSettled: markAsSettled || isFullPayment,
+        settlementReason: markAsSettled ? settlementReason : undefined,
+      });
       onPaymentSuccess(updated);
       onClose();
       Alert.alert(
         'Payment Recorded! ✓',
-        `₹${amount.toLocaleString('en-IN')} received via ${selectedMode}.\nNew Balance Due: ₹${updated.balanceDue.toLocaleString('en-IN')}`
+        markAsSettled && taxAmount > 0
+          ? `₹${amount.toLocaleString('en-IN')} received via ${selectedMode}.\nRemaining ₹${taxAmount.toLocaleString('en-IN')} marked settled as ${settlementReason}.\nBill is now marked Settled in Full ✓`
+          : `₹${amount.toLocaleString('en-IN')} received via ${selectedMode}.\nNew Balance Due: ₹${updated.balanceDue.toLocaleString('en-IN')}`
       );
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to record payment. Please try again.');
@@ -169,28 +186,51 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
                 <Text style={styles.sectionLabel}>QUICK AMOUNT PRESETS:</Text>
                 <View style={styles.presetsRow}>
                   <TouchableOpacity
-                    onPress={() => handleApplyPreset(currentDue)}
-                    style={[styles.presetChip, numericAmount === currentDue && styles.presetChipActive]}
+                    onPress={() => handleApplyPreset(currentDue, false)}
+                    style={[
+                      styles.presetChip,
+                      numericAmount === currentDue && !markAsSettled && styles.presetChipActive,
+                    ]}
                     activeOpacity={0.7}
                   >
                     <MaterialIcons
                       name="check-circle"
-                      size={15}
-                      color={numericAmount === currentDue ? '#FFF' : COLORS.primary}
+                      size={14}
+                      color={numericAmount === currentDue && !markAsSettled ? '#FFF' : COLORS.primary}
                     />
                     <Text
                       style={[
                         styles.presetChipText,
-                        numericAmount === currentDue && styles.presetChipTextActive,
+                        numericAmount === currentDue && !markAsSettled && styles.presetChipTextActive,
                       ]}
                     >
                       Full Due ({formatCurrency(currentDue)})
                     </Text>
                   </TouchableOpacity>
 
+                  {currentDue >= 2000 && (
+                    <TouchableOpacity
+                      onPress={() => handleApplyPreset(currentDue * 0.98, true)}
+                      style={[
+                        styles.presetChip,
+                        markAsSettled && settlementReason === 'TDS / Tax Deduction' && styles.presetChipActive,
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.presetChipText,
+                          markAsSettled && settlementReason === 'TDS / Tax Deduction' && styles.presetChipTextActive,
+                        ]}
+                      >
+                        Net 2% TDS ({formatCurrency(Math.round(currentDue * 0.98))})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   {currentDue > 500 && (
                     <TouchableOpacity
-                      onPress={() => handleApplyPreset(Math.round(currentDue / 2))}
+                      onPress={() => handleApplyPreset(Math.round(currentDue / 2), false)}
                       style={styles.presetChip}
                       activeOpacity={0.7}
                     >
@@ -205,7 +245,7 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
 
             {/* Amount Received Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>AMOUNT RECEIVED NOW (₹) *</Text>
+              <Text style={styles.inputLabel}>ACTUAL AMOUNT RECEIVED IN HAND (₹) *</Text>
               <View style={styles.amountInputWrapper}>
                 <Text style={styles.rupeeSymbol}>₹</Text>
                 <TextInput
@@ -224,26 +264,83 @@ export const RegisterPaymentModal: React.FC<RegisterPaymentModalProps> = ({
                 <View
                   style={[
                     styles.feedbackBanner,
-                    isFullPayment ? styles.feedbackBannerSuccess : styles.feedbackBannerPartial,
+                    (isFullPayment || markAsSettled)
+                      ? styles.feedbackBannerSuccess
+                      : styles.feedbackBannerPartial,
                   ]}
                 >
                   <MaterialIcons
-                    name={isFullPayment ? 'task-alt' : 'hourglass-bottom'}
+                    name={(isFullPayment || markAsSettled) ? 'task-alt' : 'hourglass-bottom'}
                     size={16}
-                    color={isFullPayment ? '#15803D' : '#B45309'}
+                    color={(isFullPayment || markAsSettled) ? '#15803D' : '#B45309'}
                   />
                   <Text
                     style={[
                       styles.feedbackText,
-                      { color: isFullPayment ? '#15803D' : '#B45309' },
+                      { color: (isFullPayment || markAsSettled) ? '#15803D' : '#B45309' },
                     ]}
                   >
                     {isFullPayment
-                      ? 'This bill will be Fully Paid ✓'
-                      : `Remaining Balance will be ${formatCurrency(remainingAfterPayment)}`}
+                      ? 'Full payment received! Bill will be Fully Paid ✓'
+                      : markAsSettled
+                      ? `₹${numericAmount.toLocaleString('en-IN')} received. Remaining ₹${remainingAfterPayment.toLocaleString('en-IN')} settled as ${settlementReason} ✓`
+                      : `Remaining balance will be ${formatCurrency(remainingAfterPayment)}`}
                   </Text>
                 </View>
               ) : null}
+
+              {/* Deduction / Tax Settlement Option */}
+              {numericAmount < currentDue && numericAmount > 0 && (
+                <View style={styles.deductionContainer}>
+                  <TouchableOpacity
+                    onPress={() => setMarkAsSettled(!markAsSettled)}
+                    style={styles.deductionCheckRow}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons
+                      name={markAsSettled ? 'check-box' : 'check-box-outline-blank'}
+                      size={20}
+                      color={markAsSettled ? COLORS.primary : COLORS.textMuted}
+                    />
+                    <Text style={styles.deductionCheckLabel}>
+                      Remaining ₹{remainingAfterPayment.toLocaleString('en-IN')} is Tax/TDS or Deducted (Settle in Full)
+                    </Text>
+                  </TouchableOpacity>
+
+                  {markAsSettled && (
+                    <View style={styles.reasonChipsWrap}>
+                      <Text style={styles.reasonPromptText}>Select deduction reason:</Text>
+                      <View style={styles.reasonsRow}>
+                        {[
+                          'TDS / Tax Deduction',
+                          'Retention Money',
+                          'Settlement Discount',
+                          'Client Deduction',
+                        ].map((r) => (
+                          <TouchableOpacity
+                            key={r}
+                            onPress={() => setSettlementReason(r)}
+                            style={[
+                              styles.reasonPill,
+                              settlementReason === r && styles.reasonPillActive,
+                            ]}
+                            activeOpacity={0.75}
+                          >
+                            <Text
+                              style={[
+                                styles.reasonPillText,
+                                settlementReason === r && styles.reasonPillTextActive,
+                              ]}
+                            >
+                              {r}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
 
             {/* Payment Method Selector */}
@@ -571,5 +668,62 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.textMuted,
+  },
+  deductionContainer: {
+    marginTop: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+  },
+  deductionCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deductionCheckLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    lineHeight: 16,
+  },
+  reasonChipsWrap: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  reasonPromptText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginBottom: 6,
+  },
+  reasonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  reasonPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  reasonPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  reasonPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  reasonPillTextActive: {
+    color: '#FFFFFF',
   },
 });

@@ -59,7 +59,12 @@ export async function registerBillPayment(
   billId: string,
   amountReceived: number,
   mode: string = 'Cash',
-  note?: string
+  note?: string,
+  options?: {
+    taxDeducted?: number;
+    markAsSettled?: boolean;
+    settlementReason?: string;
+  }
 ): Promise<Bill> {
   try {
     const bills = await getBills();
@@ -72,7 +77,14 @@ export async function registerBillPayment(
     const netTotal = Math.max(0, bill.subtotal - (bill.discount || 0));
     const currentPaid = bill.advancePaid || 0;
     const newTotalPaid = Math.min(netTotal, currentPaid + amountReceived);
-    const newBalanceDue = Math.max(0, netTotal - newTotalPaid);
+
+    const taxAmount = options?.taxDeducted || 0;
+    let newBalanceDue = Math.max(0, netTotal - (newTotalPaid + taxAmount));
+    if (options?.markAsSettled) {
+      newBalanceDue = 0;
+    }
+
+    const totalTaxDeducted = (bill.taxDeducted || 0) + taxAmount;
 
     const newRecord: PaymentRecord = {
       id: `pay_${Date.now()}`,
@@ -80,6 +92,8 @@ export async function registerBillPayment(
       date: new Date().toISOString().split('T')[0],
       mode: mode,
       note: note ? note.trim() : undefined,
+      taxDeduction: taxAmount > 0 ? taxAmount : undefined,
+      isSettlement: Boolean(options?.markAsSettled || newBalanceDue === 0),
       receivedAt: Date.now(),
     };
 
@@ -89,6 +103,9 @@ export async function registerBillPayment(
       ...bill,
       advancePaid: newTotalPaid,
       balanceDue: newBalanceDue,
+      taxDeducted: totalTaxDeducted > 0 ? totalTaxDeducted : undefined,
+      isSettled: Boolean(options?.markAsSettled || newBalanceDue === 0),
+      settlementReason: options?.settlementReason || bill.settlementReason,
       paymentRecords: updatedRecords,
     };
 

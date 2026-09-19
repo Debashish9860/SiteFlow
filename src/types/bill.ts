@@ -18,6 +18,8 @@ export interface PaymentRecord {
   date: string; // YYYY-MM-DD
   mode: 'Cash' | 'UPI' | 'Bank Transfer' | 'Cheque' | string;
   note?: string;
+  taxDeduction?: number;
+  isSettlement?: boolean;
   receivedAt: number;
 }
 
@@ -39,6 +41,9 @@ export interface Bill {
   discount: number;
   advancePaid: number;
   balanceDue: number;
+  taxDeducted?: number; // Tax/TDS or retention deducted by client
+  isSettled?: boolean; // Fully settled/cleared
+  settlementReason?: string; // Reason for balance deduction (e.g. 'TDS / Tax', 'Retention', 'Settled')
   notes?: string;
   paymentRecords?: PaymentRecord[];
   createdAt: number;

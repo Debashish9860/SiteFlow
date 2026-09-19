@@ -141,6 +141,8 @@ const AnimatedBillCard: React.FC<{
                 >
                   {item.balanceDue > 0
                     ? `Due: ${formatCurrency(item.balanceDue)}`
+                    : item.taxDeducted
+                    ? 'Settled (Tax/TDS) ✓'
                     : 'Fully Paid ✓'}
                 </Text>
               </View>
@@ -286,7 +288,9 @@ export const HomeScreen: React.FC = () => {
   const quotations = bills.filter((b) => b.billType === 'quotation');
 
   const totalInvoiced = invoices.reduce((acc, b) => acc + (b.subtotal - b.discount), 0);
+  const totalReceived = invoices.reduce((acc, b) => acc + (b.advancePaid || 0), 0);
   const totalDue = invoices.reduce((acc, b) => acc + b.balanceDue, 0);
+  const totalTaxDeducted = invoices.reduce((acc, b) => acc + (b.taxDeducted || 0), 0);
   const totalQuoted = quotations.reduce((acc, b) => acc + (b.subtotal - b.discount), 0);
 
   const filteredBills = bills.filter((b) => {
@@ -351,98 +355,125 @@ export const HomeScreen: React.FC = () => {
             >
               {/* Financial Stats Overview */}
               <View style={styles.statsContainer}>
-                {/* 1. Hero Revenue Card */}
+                {/* 1. HERO CARD: ACTUAL AMOUNT RECEIVED (CASH IN HAND / BANK) */}
                 <TouchableOpacity
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                   onPress={() => setFilterType(filterType === 'invoice' ? 'all' : 'invoice')}
-                  style={[
-                    styles.heroSummaryCard,
-                    filterType === 'invoice' && styles.heroCardActive,
-                  ]}
+                  style={styles.heroReceivedCard}
                 >
-                  <View style={styles.heroCardHeader}>
+                  <View style={styles.heroReceivedHeader}>
                     <View style={styles.heroLabelRow}>
-                      <View style={styles.heroIconBadge}>
-                        <MaterialIcons name="account-balance-wallet" size={20} color="#FFFFFF" />
+                      <View style={styles.heroReceivedIconBadge}>
+                        <MaterialIcons name="payments" size={22} color="#FFFFFF" />
                       </View>
                       <View>
-                        <Text style={styles.heroCardLabel}>TOTAL INVOICED REVENUE</Text>
-                        <Text style={styles.heroCardSub}>
-                          {invoices.length} {invoices.length === 1 ? 'Invoice' : 'Invoices'} issued
+                        <Text style={styles.heroReceivedLabel}>ACTUAL AMOUNT RECEIVED</Text>
+                        <Text style={styles.heroReceivedSub}>
+                          Collected Cash & Bank • {invoices.filter((i) => (i.advancePaid || 0) > 0).length} receipts
                         </Text>
                       </View>
                     </View>
-                    <View
-                      style={[
-                        styles.filterBadgePill,
-                        filterType === 'invoice' && styles.filterBadgePillActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterBadgeText,
-                          filterType === 'invoice' && styles.filterBadgeTextActive,
-                        ]}
-                      >
-                        {filterType === 'invoice' ? 'SHOWING INVOICES' : 'TAP TO FILTER'}
+                    <View style={styles.receivedTagPill}>
+                      <Text style={styles.receivedTagText}>
+                        {Math.min(100, Math.round((totalReceived / (totalInvoiced || 1)) * 100))}% COLLECTED
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.heroAmount}>{formatCurrency(totalInvoiced)}</Text>
+
+                  <Text style={styles.heroReceivedAmount}>{formatCurrency(totalReceived)}</Text>
+
+                  {/* Progress Track showing Received vs Invoiced */}
+                  <View style={styles.receivedProgressTrack}>
+                    <View
+                      style={[
+                        styles.receivedProgressFill,
+                        {
+                          width: `${Math.min(100, Math.round((totalReceived / (totalInvoiced || 1)) * 100))}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.receivedProgressLegend}>
+                    <Text style={styles.legendBilledText}>
+                      Total Billed: {formatCurrency(totalInvoiced)}
+                    </Text>
+                    <Text style={styles.legendDueText}>
+                      {totalTaxDeducted > 0
+                        ? `Due: ${formatCurrency(totalDue)} • Tax/TDS: ${formatCurrency(totalTaxDeducted)}`
+                        : `Pending: ${formatCurrency(totalDue)}`}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
 
-                {/* 2. Symmetrical Twin Metric Cards: Pending Due & Quotations */}
-                <View style={styles.twinCardsRow}>
-                  {/* Left: Pending Due Card */}
+                {/* 2. Tri-Card Metric Grid: Total Billed | Pending/Tax | Quotations */}
+                <View style={styles.triCardsRow}>
+                  {/* Total Billed Card */}
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => setFilterType(filterType === 'invoice' ? 'all' : 'invoice')}
                     style={[
-                      styles.twinCard,
-                      styles.twinCardDue,
-                      filterType === 'invoice' && styles.twinCardActive,
+                      styles.metricCard,
+                      filterType === 'invoice' && styles.metricCardActive,
                     ]}
                   >
-                    <View style={styles.twinCardHeader}>
-                      <Text style={[styles.twinCardLabel, { color: '#B91C1C' }]}>PENDING DUE</Text>
-                      <View style={styles.dueIconBadge}>
-                        <MaterialIcons name="pending-actions" size={16} color="#DC2626" />
-                      </View>
+                    <View style={styles.metricCardTop}>
+                      <Text style={styles.metricCardLabel}>TOTAL BILLED</Text>
+                      <MaterialIcons name="receipt-long" size={15} color={COLORS.primary} />
                     </View>
-                    <Text style={[styles.twinAmount, { color: '#DC2626' }]}>
-                      {formatCurrency(totalDue)}
+                    <Text style={styles.metricCardAmount} numberOfLines={1}>
+                      {formatCurrency(totalInvoiced)}
                     </Text>
-                    <View style={styles.twinCardFooter}>
-                      <Text style={styles.twinSubDue}>
-                        {invoices.filter((i) => i.balanceDue > 0).length} unpaid bills
-                      </Text>
-                    </View>
+                    <Text style={styles.metricCardSub} numberOfLines={1}>
+                      {invoices.length} {invoices.length === 1 ? 'Invoice' : 'Invoices'}
+                    </Text>
                   </TouchableOpacity>
 
-                  {/* Right: Quotations Card */}
+                  {/* Pending / Tax Deductions Card */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setFilterType(filterType === 'invoice' ? 'all' : 'invoice')}
+                    style={[
+                      styles.metricCard,
+                      styles.metricCardDue,
+                      filterType === 'invoice' && styles.metricCardActive,
+                    ]}
+                  >
+                    <View style={styles.metricCardTop}>
+                      <Text style={[styles.metricCardLabel, { color: '#B91C1C' }]}>
+                        {totalTaxDeducted > 0 ? 'DUE / TAX' : 'PENDING DUE'}
+                      </Text>
+                      <MaterialIcons name="pending-actions" size={15} color="#DC2626" />
+                    </View>
+                    <Text style={[styles.metricCardAmount, { color: '#DC2626' }]} numberOfLines={1}>
+                      {formatCurrency(totalDue)}
+                    </Text>
+                    <Text style={styles.metricCardSub} numberOfLines={1}>
+                      {totalTaxDeducted > 0
+                        ? `+${formatCurrency(totalTaxDeducted)} Tax`
+                        : `${invoices.filter((i) => i.balanceDue > 0).length} Unpaid`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Quotations Card */}
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => setFilterType(filterType === 'quotation' ? 'all' : 'quotation')}
                     style={[
-                      styles.twinCard,
-                      styles.twinCardQuote,
-                      filterType === 'quotation' && styles.twinCardActive,
+                      styles.metricCard,
+                      styles.metricCardQuote,
+                      filterType === 'quotation' && styles.metricCardActive,
                     ]}
                   >
-                    <View style={styles.twinCardHeader}>
-                      <Text style={[styles.twinCardLabel, { color: '#B45309' }]}>QUOTATIONS</Text>
-                      <View style={styles.quoteIconBadge}>
-                        <MaterialIcons name="request-quote" size={16} color="#D97706" />
-                      </View>
+                    <View style={styles.metricCardTop}>
+                      <Text style={[styles.metricCardLabel, { color: '#B45309' }]}>QUOTATIONS</Text>
+                      <MaterialIcons name="request-quote" size={15} color="#D97706" />
                     </View>
-                    <Text style={[styles.twinAmount, { color: '#B45309' }]}>
+                    <Text style={[styles.metricCardAmount, { color: '#B45309' }]} numberOfLines={1}>
                       {formatCurrency(totalQuoted)}
                     </Text>
-                    <View style={styles.twinCardFooter}>
-                      <Text style={styles.twinSubQuote}>
-                        {quotations.length} {quotations.length === 1 ? 'estimate' : 'estimates'} active
-                      </Text>
-                    </View>
+                    <Text style={styles.metricCardSub} numberOfLines={1}>
+                      {quotations.length} {quotations.length === 1 ? 'Estimate' : 'Estimates'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -630,26 +661,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
   },
-  heroSummaryCard: {
+  heroReceivedCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: '#F1D9DE',
+    borderColor: '#86EFAC',
     borderLeftWidth: 5,
-    borderLeftColor: COLORS.primary,
+    borderLeftColor: '#16A34A',
     marginBottom: 10,
     elevation: 3,
-    shadowColor: COLORS.primary,
+    shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 6,
   },
-  heroCardActive: {
-    backgroundColor: '#FCF5F7',
-    borderColor: COLORS.primary,
-  },
-  heroCardHeader: {
+  heroReceivedHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -659,127 +686,122 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
-  heroIconBadge: {
+  heroReceivedIconBadge: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#16A34A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCardLabel: {
+  heroReceivedLabel: {
     fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.primary,
+    fontWeight: '900',
+    color: '#15803D',
     letterSpacing: 0.8,
   },
-  heroCardSub: {
+  heroReceivedSub: {
     fontSize: 11,
     color: COLORS.textMuted,
     fontWeight: '600',
   },
-  filterBadgePill: {
-    backgroundColor: 'rgba(124, 16, 52, 0.08)',
+  receivedTagPill: {
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  filterBadgePillActive: {
-    backgroundColor: COLORS.primary,
-  },
-  filterBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-  },
-  filterBadgeTextActive: {
-    color: '#FFFFFF',
-  },
-  heroAmount: {
-    fontSize: 26,
+  receivedTagText: {
+    fontSize: 9.5,
     fontWeight: '900',
-    color: COLORS.textPrimary,
+    color: '#15803D',
     letterSpacing: 0.5,
-    marginTop: 4,
   },
-  twinCardsRow: {
+  heroReceivedAmount: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  receivedProgressTrack: {
+    height: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  receivedProgressFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 3,
+  },
+  receivedProgressLegend: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  twinCard: {
-    flex: 1,
-    padding: 13,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
     justifyContent: 'space-between',
-    minHeight: 106,
+    alignItems: 'center',
+    marginTop: 6,
   },
-  twinCardDue: {
+  legendBilledText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  legendDueText: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  triCardsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  metricCard: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    elevation: 1,
+    justifyContent: 'space-between',
+    minHeight: 88,
+  },
+  metricCardActive: {
+    borderColor: COLORS.primary,
+  },
+  metricCardDue: {
     backgroundColor: '#FFF8F8',
     borderColor: '#FEE2E2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
   },
-  twinCardQuote: {
+  metricCardQuote: {
     backgroundColor: '#FFFDF5',
     borderColor: '#FEF3C7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
   },
-  twinCardActive: {
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-  },
-  twinCardHeader: {
+  metricCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
-  twinCardLabel: {
-    fontSize: 11,
+  metricCardLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.5,
+  },
+  metricCardAmount: {
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 0.6,
+    color: COLORS.textPrimary,
   },
-  dueIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quoteIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  twinAmount: {
-    fontSize: 17,
-    fontWeight: '900',
-    marginVertical: 4,
-  },
-  twinCardFooter: {
+  metricCardSub: {
+    fontSize: 9.5,
+    color: COLORS.textMuted,
+    fontWeight: '600',
     marginTop: 2,
-  },
-  twinSubDue: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  twinSubQuote: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#B45309',
   },
   actionContainer: {
     marginVertical: 6,

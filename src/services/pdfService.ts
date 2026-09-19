@@ -384,17 +384,33 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
                   <div class="grand-total-val">₹ ${totalAmount.toLocaleString('en-IN')}/-</div>
                 </div>
                 ${
-                  (bill.advancePaid || 0) > 0
+                  (bill.advancePaid || 0) > 0 || (bill.taxDeducted || 0) > 0
                     ? `
                   <div class="payment-sub-table">
                     <div class="pay-sub-row">
-                      <span>Received / Paid:</span>
-                      <strong>₹ ${(bill.advancePaid || 0).toLocaleString('en-IN')}/-</strong>
+                      <span>Actual Received:</span>
+                      <strong style="color: #15803D;">₹ ${(bill.advancePaid || 0).toLocaleString('en-IN')}/-</strong>
                     </div>
+                    ${
+                      (bill.taxDeducted || 0) > 0
+                        ? `
+                    <div class="pay-sub-row">
+                      <span>Tax / TDS Deducted:</span>
+                      <strong style="color: #D97706;">₹ ${(bill.taxDeducted || 0).toLocaleString('en-IN')}/-</strong>
+                    </div>
+                    `
+                        : ''
+                    }
                     <div class="pay-sub-row due-row">
                       <span>${bill.balanceDue === 0 ? 'Status:' : 'Balance Due:'}</span>
                       <strong style="color: ${bill.balanceDue === 0 ? '#15803D' : '#7C1034'};">
-                        ${bill.balanceDue === 0 ? 'FULLY PAID ✓' : `₹ ${bill.balanceDue.toLocaleString('en-IN')}/-`}
+                        ${
+                          bill.balanceDue === 0
+                            ? bill.isSettled || (bill.taxDeducted || 0) > 0
+                              ? 'FULLY SETTLED & PAID ✓'
+                              : 'FULLY PAID ✓'
+                            : `₹ ${bill.balanceDue.toLocaleString('en-IN')}/-`
+                        }
                       </strong>
                     </div>
                   </div>
