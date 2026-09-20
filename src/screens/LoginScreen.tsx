@@ -18,8 +18,6 @@ import { CustomInput } from '../components/CustomInput';
 import { BigButton } from '../components/BigButton';
 import { useAuth } from '../context/AuthContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import { RecaptchaWidget } from '../components/RecaptchaWidget';
-import { verifyRecaptchaToken } from '../services/recaptchaService';
 
 export const LoginScreen: React.FC = () => {
   const { login, signup } = useAuth();
@@ -31,8 +29,6 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const [recaptchaError, setRecaptchaError] = useState<string>('');
 
   // Entrance Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,7 +59,6 @@ export const LoginScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     setErrorMessage('');
-    setRecaptchaError('');
 
     if (!email.trim() || !password.trim()) {
       setErrorMessage('Please enter both email and password.');
@@ -74,24 +69,8 @@ export const LoginScreen: React.FC = () => {
       return;
     }
 
-    if (!recaptchaToken) {
-      setRecaptchaError('Please complete the Google reCAPTCHA verification.');
-      setErrorMessage('Security verification required. Please tick "I\'m not a robot".');
-      return;
-    }
-
     setSubmitting(true);
     try {
-      // Validate token with Google verification service
-      const verifyResult = await verifyRecaptchaToken(recaptchaToken);
-      if (!verifyResult.success) {
-        setRecaptchaToken(null);
-        setRecaptchaError(verifyResult.error || 'reCAPTCHA expired or invalid.');
-        setErrorMessage(verifyResult.error || 'Security verification failed. Please try again.');
-        setSubmitting(false);
-        return;
-      }
-
       if (isSignUp) {
         await signup(name, email, password);
       } else {
@@ -108,8 +87,6 @@ export const LoginScreen: React.FC = () => {
     setEmail(demoEmail);
     setPassword(demoPass);
     if (demoName) setName(demoName);
-    setRecaptchaToken('demo-verified-token');
-    setRecaptchaError('');
     setErrorMessage('');
     setSubmitting(true);
     try {
@@ -195,40 +172,54 @@ export const LoginScreen: React.FC = () => {
             {/* Error Message Box */}
             {errorMessage ? (
               <View style={styles.errorBox}>
-                <MaterialIcons name="error-outline" size={18} color="#DC2626" />
+                <MaterialIcons name="error-outline" size={18} color={COLORS.danger || '#DC2626'} />
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
 
-            {/* Form Inputs */}
+            {/* Name Input (Sign Up Only) */}
             {isSignUp ? (
               <CustomInput
                 label="Full Name *"
-                placeholder="e.g. Ramesh Raut"
+                placeholder="e.g. Ramesh Raut / Rajeeb Raut"
                 value={name}
-                onChangeText={setName}
+                onChangeText={(val) => {
+                  setName(val);
+                  setErrorMessage('');
+                }}
                 iconName="person"
+                required
               />
             ) : null}
 
+            {/* Email Input */}
             <CustomInput
               label="Email Address *"
-              placeholder="e.g. rajeebraut@gmail.com"
+              placeholder="e.g. rameshraut@gmail.com"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(val) => {
+                setEmail(val);
+                setErrorMessage('');
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               iconName="email"
+              required
             />
 
-            <View style={styles.passwordWrapper}>
+            {/* Password Input */}
+            <View style={{ position: 'relative' }}>
               <CustomInput
                 label="Password *"
                 placeholder="Enter password (min 6 characters)"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  setErrorMessage('');
+                }}
                 secureTextEntry={!showPassword}
                 iconName="lock"
+                required
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
@@ -242,24 +233,6 @@ export const LoginScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
-
-            {/* Google reCAPTCHA Verification Widget */}
-            <RecaptchaWidget
-              isVerified={!!recaptchaToken}
-              onVerify={(token) => {
-                setRecaptchaToken(token);
-                setRecaptchaError('');
-                setErrorMessage('');
-              }}
-              onExpire={() => {
-                setRecaptchaToken(null);
-              }}
-              onReset={() => {
-                setRecaptchaToken(null);
-                setRecaptchaError('');
-              }}
-              errorMessage={recaptchaError}
-            />
 
             {/* Submit Action Button */}
             <BigButton

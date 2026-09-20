@@ -8,25 +8,46 @@ const LAST_SYNC_KEY = '@siteflow_last_cloud_sync';
 const AUTO_SYNC_ENABLED_KEY = '@siteflow_auto_sync_enabled';
 
 // Local network endpoints: localhost for Web/Simulator, LAN IP for physical device
+export const SERVER_ENDPOINT_KEY = '@siteflow_server_endpoint';
 const LOCALHOST_ENDPOINT = 'http://localhost:5050';
-const LAN_ENDPOINT = 'http://10.13.28.162:5050';
+const DEFAULT_LAN_ENDPOINT = 'http://10.13.28.162:5050';
 
 let cachedWorkingEndpoint: string | null = null;
 
 /**
- * Determine best reachable endpoint for the MongoDB Atlas sync server
+ * Get current configured sync server endpoint
+ */
+export async function getServerEndpoint(): Promise<string> {
+  try {
+    const saved = await AsyncStorage.getItem(SERVER_ENDPOINT_KEY);
+    if (saved && saved.trim()) return saved.trim();
+  } catch {}
+  return Platform.OS === 'web' ? LOCALHOST_ENDPOINT : DEFAULT_LAN_ENDPOINT;
+}
+
+/**
+ * Set custom sync server endpoint
+ */
+export async function setServerEndpoint(url: string): Promise<void> {
+  cachedWorkingEndpoint = null;
+  const cleanUrl = url.trim().replace(/\/+$/, '');
+  await AsyncStorage.setItem(SERVER_ENDPOINT_KEY, cleanUrl);
+}
+
+/**
+ * Determine best reachable endpoint for the sync server
  */
 async function getApiEndpoint(): Promise<string> {
   if (cachedWorkingEndpoint) return cachedWorkingEndpoint;
 
-  const candidates = Platform.OS === 'web' 
-    ? [LOCALHOST_ENDPOINT, LAN_ENDPOINT] 
-    : [LAN_ENDPOINT, LOCALHOST_ENDPOINT];
+  const customEndpoint = await getServerEndpoint();
+  const candidates = [customEndpoint, DEFAULT_LAN_ENDPOINT, LOCALHOST_ENDPOINT];
+  const uniqueCandidates = Array.from(new Set(candidates));
 
-  for (const url of candidates) {
+  for (const url of uniqueCandidates) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const res = await fetch(`${url}/api/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
@@ -38,8 +59,8 @@ async function getApiEndpoint(): Promise<string> {
     }
   }
 
-  // Default fallback based on platform
-  return Platform.OS === 'web' ? LOCALHOST_ENDPOINT : LAN_ENDPOINT;
+  // Fallback to configured or platform default
+  return customEndpoint;
 }
 
 export interface CloudStatusResult {
@@ -74,8 +95,24 @@ export async function checkCloudConnection(): Promise<CloudStatusResult> {
       return { connected: false, error: `Server returned HTTP ${res.status}` };
     }
   } catch (err: any) {
-    return { connected: false, error: err?.message || 'Sync server unreachable' };
+    return { connected: false, error: formatNetworkError(err, cachedWorkingEndpoint || 'Server') };
   }
+}
+
+function formatNetworkError(err: any, endpoint: string): string {
+  const msg = String(err?.message || '');
+  if (msg.includes('CLEARTEXT') || msg.includes('network security policy')) {
+    return 'Network security policy blocked HTTP. Please install the updated APK with cleartext enabled.';
+  }
+  if (
+    msg.includes('Network request failed') ||
+    msg.includes('Failed to fetch') ||
+    msg.includes('Aborted') ||
+    msg.includes('timeout')
+  ) {
+    return `Cannot connect to sync server (${endpoint}). Please ensure both devices are connected to the same Wi-Fi/Hotspot network.`;
+  }
+  return msg || 'Failed to communicate with sync server.';
 }
 
 /**
@@ -155,10 +192,11 @@ export async function pullAndSyncTeamBills(): Promise<{
     };
   } catch (err: any) {
     console.warn('[PullAndSync Error]', err);
+    const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
     return {
       success: false,
       billsCount: 0,
-      message: err?.message || 'Failed to sync with cloud.',
+      message: formatNetworkError(err, endpoint),
     };
   }
 }
@@ -212,10 +250,11 @@ export async function syncAllToCloud(): Promise<{
     };
   } catch (err: any) {
     console.warn('[CloudSync Error]', err);
+    const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
     return {
       success: false,
       syncedCount: 0,
-      message: err?.message || 'Failed to sync with cloud database.',
+      message: formatNetworkError(err, endpoint),
     };
   }
 }
@@ -262,10 +301,11 @@ export async function restoreAllFromCloud(): Promise<{
     };
   } catch (err: any) {
     console.error('[CloudRestore Error]', err);
+    const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
     return {
       success: false,
       billsRestored: 0,
-      message: err?.message || 'Failed to restore data from cloud database.',
+      message: formatNetworkError(err, endpoint),
     };
   }
 }

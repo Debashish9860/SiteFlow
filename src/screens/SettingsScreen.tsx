@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Switch,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
@@ -32,6 +33,8 @@ import {
   getLastCloudSyncTime,
   isAutoSyncEnabled,
   setAutoSyncEnabled,
+  getServerEndpoint,
+  setServerEndpoint,
   CloudStatusResult,
 } from '../services/cloudSyncService';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -60,6 +63,8 @@ export const SettingsScreen: React.FC = () => {
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [restoringCloud, setRestoringCloud] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
+  const [serverUrl, setServerUrl] = useState('');
+  const [testingConnection, setTestingConnection] = useState(false);
 
   // Sync Success Toast State
   const [showSyncToast, setShowSyncToast] = useState(false);
@@ -74,13 +79,15 @@ export const SettingsScreen: React.FC = () => {
 
   const loadCloudSyncState = async () => {
     try {
-      const [status, lastTime, autoEnabled] = await Promise.all([
+      const [status, lastTime, autoEnabled, currentUrl] = await Promise.all([
         checkCloudConnection(),
         getLastCloudSyncTime(),
         isAutoSyncEnabled(),
+        getServerEndpoint(),
       ]);
       setCloudStatus(status);
       setAutoSync(autoEnabled);
+      setServerUrl(currentUrl);
       if (lastTime) {
         const d = new Date(lastTime);
         setLastSyncText(
@@ -147,6 +154,25 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleTestConnection = async () => {
+    if (!serverUrl.trim()) return;
+    setTestingConnection(true);
+    try {
+      await setServerEndpoint(serverUrl.trim());
+      const status = await checkCloudConnection();
+      setCloudStatus(status);
+      if (status.connected) {
+        Alert.alert('Connection Successful', 'Successfully connected to the sync server & cloud database!');
+      } else {
+        Alert.alert('Connection Notice', status.error || 'Server is not reachable at this address.');
+      }
+    } catch (e: any) {
+      Alert.alert('Connection Failed', e?.message || 'Could not reach server.');
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   const handleToggleAutoSync = async (val: boolean) => {
@@ -426,6 +452,51 @@ export const SettingsScreen: React.FC = () => {
                 <Text style={[styles.cloudStatValue, { color: '#0F172A', fontWeight: '800' }]}>
                   Secure Cloud
                 </Text>
+              </View>
+            </View>
+
+            {/* Server Endpoint Configuration */}
+            <View style={{ marginTop: 12, marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4, letterSpacing: 0.5 }}>
+                SYNC SERVER URL:
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 13,
+                    color: COLORS.textPrimary,
+                  }}
+                  value={serverUrl}
+                  onChangeText={setServerUrl}
+                  placeholder="http://10.13.28.162:5050"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={handleTestConnection}
+                  disabled={testingConnection}
+                  style={{
+                    backgroundColor: COLORS.primary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {testingConnection ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Test</Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
 
