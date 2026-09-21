@@ -11,7 +11,9 @@ import {
   Animated,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
@@ -73,59 +75,78 @@ const AnimatedBillCard: React.FC<{
       }}
     >
       <TouchableOpacity
-        activeOpacity={0.82}
+        activeOpacity={0.85}
         style={[
           styles.billCard,
           isQuote ? styles.billCardQuote : styles.billCardInvoice,
         ]}
         onPress={onPress}
       >
-        {/* Card Top Row */}
-        <View style={styles.billCardTop}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <View style={styles.tagRow}>
-              <View
+        {/* Top Header: Doc Type Tag, Issuer Badge & Date */}
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderLeft}>
+            <View
+              style={[
+                styles.docTypeTag,
+                isQuote ? styles.docTypeTagQuote : styles.docTypeTagInvoice,
+              ]}
+            >
+              <Text
                 style={[
-                  styles.docTypeTag,
-                  isQuote ? styles.docTypeTagQuote : styles.docTypeTagInvoice,
+                  styles.docTypeTagText,
+                  isQuote ? styles.docTypeTagTextQuote : styles.docTypeTagTextInvoice,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.docTypeTagText,
-                    isQuote ? styles.docTypeTagTextQuote : styles.docTypeTagTextInvoice,
-                  ]}
-                >
-                  {isQuote ? 'QUOTATION' : 'INVOICE'}
-                </Text>
-              </View>
-              <Text style={styles.billedByTag}>👤 {item.billedBy || 'Ramesh Raut'}</Text>
+                {isQuote ? 'QUOTATION' : 'INVOICE'}
+              </Text>
             </View>
+            <View style={styles.billedByBadge}>
+              <MaterialIcons name="person" size={12} color="#64748B" />
+              <Text style={styles.billedByText}>
+                {item.billedBy || 'Ramesh Raut'}
+              </Text>
+            </View>
+          </View>
 
-            {/* Client Name in BOLD */}
-            <Text style={styles.clientName}>{item.customerName}</Text>
+          <View style={styles.cardDateBadge}>
+            <MaterialIcons name="event" size={12} color="#94A3B8" />
+            <Text style={styles.cardDateText}>{formatDate(item.date)}</Text>
+          </View>
+        </View>
 
-            {/* Below client name, site name on the right side */}
-            <View style={styles.siteRowRight}>
-              <Text style={styles.siteLabelSmall}>Site:</Text>
-              <Text style={styles.siteTextRight}>
-                {item.siteLocation || '—'}
+        {/* Main Body: Customer & Site on Left, Total Amount on Right */}
+        <View style={styles.cardBodyRow}>
+          <View style={styles.cardClientInfo}>
+            <Text style={styles.clientName} numberOfLines={1}>
+              {item.customerName}
+            </Text>
+            <View style={styles.siteRow}>
+              <MaterialIcons name="location-on" size={13} color={COLORS.primary} style={styles.siteIcon} />
+              <Text style={styles.siteText} numberOfLines={1}>
+                <Text style={styles.sitePrefix}>SITE: </Text>
+                {item.siteLocation || 'General Site'}
                 {item.siteCity ? `, ${item.siteCity}` : ''}
               </Text>
             </View>
           </View>
 
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.billAmount}>₹{itemTotal.toLocaleString('en-IN')}/-</Text>
-            <Text style={styles.billDate}>{formatDate(item.date)}</Text>
+          <View style={styles.cardAmountCol}>
+            <Text style={styles.billAmount}>
+              ₹{itemTotal.toLocaleString('en-IN')}/-
+            </Text>
           </View>
         </View>
 
-        {/* Card Bottom Row */}
-        <View style={styles.billCardBottom}>
-          <View style={styles.billMeta}>
-            <Text style={styles.billMetaText}>
-              {item.billNumber} • {item.items.length} particulars
+        {/* Bottom Footer: Document # & Particulars Count, Status / Quick Pay */}
+        <View style={styles.cardFooterRow}>
+          <View style={styles.cardMetaWrap}>
+            {item.billNumber && item.billNumber.trim() !== '' && item.billNumber !== '—' ? (
+              <Text style={styles.billNumberPill}>
+                #{item.billNumber.replace(/^[—\-\s]+/, '')}
+              </Text>
+            ) : null}
+            <Text style={styles.particularsCount}>
+              {item.items.length} {item.items.length === 1 ? 'particular' : 'particulars'}
             </Text>
           </View>
 
@@ -134,7 +155,7 @@ const AnimatedBillCard: React.FC<{
               <Text style={styles.quoteStatusText}>Estimate Ready</Text>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.statusActionRow}>
               <View
                 style={[
                   styles.statusBadge,
@@ -150,7 +171,7 @@ const AnimatedBillCard: React.FC<{
                   {item.balanceDue > 0
                     ? `Due: ${formatCurrency(item.balanceDue)}`
                     : item.taxDeducted
-                    ? 'Settled (Tax/TDS) ✓'
+                    ? 'Settled (Tax) ✓'
                     : 'Fully Paid ✓'}
                 </Text>
               </View>
@@ -341,12 +362,19 @@ export const HomeScreen: React.FC = () => {
     return true;
   });
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+  const insets = useSafeAreaInsets();
+  const topSafePadding = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0
+  ) + 10;
+  const bottomSafePadding = Math.max(insets.bottom, 8);
 
-      {/* Royal Maroon Header Banner */}
-      <View style={styles.header}>
+  return (
+    <View style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent />
+
+      {/* Royal Maroon Header Banner with Notch/Camera-Cutout Safe Inset */}
+      <View style={[styles.header, { paddingTop: topSafePadding }]}>
         <View style={styles.headerContent}>
           <View style={styles.badgeRow}>
             <View style={styles.proTag}>
@@ -418,22 +446,38 @@ export const HomeScreen: React.FC = () => {
                   style={styles.heroReceivedCard}
                 >
                   <View style={styles.heroReceivedHeader}>
-                    <View style={styles.heroLabelRow}>
-                      <View style={styles.heroReceivedIconBadge}>
-                        <MaterialIcons name="payments" size={22} color="#FFFFFF" />
+                    {/* Top Row: Icon + Label on Left, % Tag Pill on Right */}
+                    <View style={styles.heroTopRow}>
+                      <View style={styles.heroLabelGroup}>
+                        <View style={styles.heroReceivedIconBadge}>
+                          <MaterialIcons name="payments" size={18} color="#FFFFFF" />
+                        </View>
+                        <Text
+                          style={styles.heroReceivedLabel}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.15}
+                        >
+                          ACTUAL RECEIVED
+                        </Text>
                       </View>
-                      <View>
-                        <Text style={styles.heroReceivedLabel}>ACTUAL AMOUNT RECEIVED</Text>
-                        <Text style={styles.heroReceivedSub}>
-                          Collected Cash & Bank • {invoices.filter((i) => (i.advancePaid || 0) > 0).length} receipts
+                      <View style={styles.receivedTagPill}>
+                        <Text
+                          style={styles.receivedTagText}
+                          maxFontSizeMultiplier={1.15}
+                        >
+                          {Math.min(100, Math.round((totalReceived / (totalInvoiced || 1)) * 100))}% COLLECTED
                         </Text>
                       </View>
                     </View>
-                    <View style={styles.receivedTagPill}>
-                      <Text style={styles.receivedTagText}>
-                        {Math.min(100, Math.round((totalReceived / (totalInvoiced || 1)) * 100))}% COLLECTED
-                      </Text>
-                    </View>
+
+                    {/* Subtitle on its own full-width line */}
+                    <Text
+                      style={styles.heroReceivedSub}
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={1.2}
+                    >
+                      Collected Cash & Bank • {invoices.filter((i) => (i.advancePaid || 0) > 0).length} receipts
+                    </Text>
                   </View>
 
                   <Text style={styles.heroReceivedAmount}>{formatCurrency(totalReceived)}</Text>
@@ -614,6 +658,15 @@ export const HomeScreen: React.FC = () => {
         />
       </Animated.View>
 
+      {/* Persistent Fixed Screen Bottom Footer with Safe Inset */}
+      <View style={[styles.fixedScreenFooter, { paddingBottom: bottomSafePadding }]}>
+        <View style={styles.footerBrandRow}>
+          <MaterialIcons name="bolt" size={14} color={COLORS.accent} />
+          <Text style={styles.footerBrandName}>POWERED BY DEBASHISH RAUT</Text>
+        </View>
+        <Text style={styles.footerBrandSub}>SiteFlow • Fast Contractor Invoicing & Cloud Sync</Text>
+      </View>
+
       {/* Interactive Quick Payment Modal */}
       <RegisterPaymentModal
         visible={selectedBillForPayment !== null}
@@ -632,7 +685,7 @@ export const HomeScreen: React.FC = () => {
         subtitle="All bills & payments are synchronized with your secure cloud storage."
         syncedCount={syncCount}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -644,7 +697,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -742,47 +794,57 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   heroReceivedHeader: {
+    marginBottom: 6,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 3,
+    gap: 8,
   },
-  heroLabelRow: {
+  heroLabelGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 7,
     flex: 1,
   },
   heroReceivedIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#16A34A',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   heroReceivedLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '900',
     color: '#15803D',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
+    flexShrink: 1,
   },
   heroReceivedSub: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: COLORS.textMuted,
     fontWeight: '600',
+    marginTop: 1,
   },
   receivedTagPill: {
     backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 10,
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   receivedTagText: {
     fontSize: 9.5,
     fontWeight: '900',
     color: '#15803D',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   heroReceivedAmount: {
     fontSize: 28,
@@ -935,8 +997,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   billCardInvoice: {
     borderLeftWidth: 4,
@@ -946,31 +1008,30 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: COLORS.accentDark,
   },
-  billCardTop: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  tagRow: {
+  cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
   },
   docTypeTag: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 4,
   },
   docTypeTagInvoice: {
-    backgroundColor: COLORS.primarySubtle,
+    backgroundColor: 'rgba(124, 16, 52, 0.1)',
   },
   docTypeTagQuote: {
     backgroundColor: '#FEF3C7',
   },
   docTypeTagText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '900',
     letterSpacing: 0.6,
   },
@@ -980,64 +1041,106 @@ const styles = StyleSheet.create({
   docTypeTagTextQuote: {
     color: COLORS.accentDark,
   },
-  billedByTag: {
+  billedByBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  billedByText: {
+    fontSize: 10.5,
+    color: '#475569',
+    fontWeight: '700',
+  },
+  cardDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  cardDateText: {
     fontSize: 11,
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
     fontWeight: '600',
+  },
+  cardBodyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  cardClientInfo: {
+    flex: 1,
+    marginRight: 10,
   },
   clientName: {
     fontSize: FONT_SIZES.md,
     fontWeight: '900',
     color: COLORS.textPrimary,
+    letterSpacing: 0.2,
+    marginBottom: 2,
   },
-  customerSubPhone: {
-    fontSize: 11,
-    color: COLORS.textMuted,
+  siteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 2,
+  },
+  siteIcon: {
     marginTop: 1,
   },
-  siteRowRight: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 4,
-  },
-  siteLabelSmall: {
+  sitePrefix: {
     fontSize: 10,
     fontWeight: '800',
     color: COLORS.primary,
-    textTransform: 'uppercase',
   },
-  siteTextRight: {
-    fontSize: 11,
-    fontWeight: '700',
+  siteText: {
+    fontSize: 11.5,
+    fontWeight: '600',
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    flexShrink: 1,
+  },
+  cardAmountCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   billAmount: {
     fontSize: FONT_SIZES.md,
     fontWeight: '900',
     color: COLORS.textPrimary,
+    letterSpacing: 0.3,
   },
-  billDate: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  billCardBottom: {
+  cardFooterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: COLORS.background,
+    borderTopColor: '#F1F5F9',
   },
-  billMeta: {
+  cardMetaWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flex: 1,
   },
-  billMetaText: {
+  billNumberPill: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: COLORS.primary,
+    backgroundColor: 'rgba(124, 16, 52, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  particularsCount: {
     fontSize: 11,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   quoteStatusBadge: {
     backgroundColor: '#FEF3C7',
@@ -1049,6 +1152,11 @@ const styles = StyleSheet.create({
     color: COLORS.accentDark,
     fontSize: 11,
     fontWeight: '800',
+  },
+  statusActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -1085,6 +1193,38 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10.5,
     fontWeight: '800',
+  },
+  fixedScreenFooter: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingVertical: 7,
+    paddingHorizontal: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  footerBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerBrandName: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.primary,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  footerBrandSub: {
+    fontSize: 9.5,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
   },
   emptyContainer: {
     alignItems: 'center',

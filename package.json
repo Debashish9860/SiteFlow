@@ -29,6 +29,7 @@
     "@types/lz-string": "^1.5.0",
     "@types/react": "~19.2.2",
     "concurrently": "^10.0.5",
+    "eas-cli": "^24.7.0",
     "typescript": "~6.0.3"
   },
   "scripts": {

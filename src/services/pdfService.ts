@@ -429,6 +429,12 @@ export function generateInvoiceHtml(bill: Bill, profile: BusinessProfile): strin
               <div class="sign-line">Authorized Signatory</div>
             </div>
           </div>
+
+          <!-- Powered by Branding -->
+          <div style="margin-top: 24px; padding-top: 10px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: #94A3B8;">
+            <span>Powered by <strong>Debashish Raut</strong></span>
+            <span>SiteFlow • Fast Contractor Billing & Cloud Sync</span>
+          </div>
         </div>
       </body>
     </html>

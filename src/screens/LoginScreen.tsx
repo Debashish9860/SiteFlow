@@ -18,6 +18,7 @@ import { CustomInput } from '../components/CustomInput';
 import { BigButton } from '../components/BigButton';
 import { useAuth } from '../context/AuthContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const LoginScreen: React.FC = () => {
   const { login, signup } = useAuth();
@@ -98,15 +99,25 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const insets = useSafeAreaInsets();
+  const topSafePadding = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0
+  ) + 16;
+  const bottomSafePadding = Math.max(insets.bottom, 16);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
+    <View style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} translucent />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: topSafePadding, paddingBottom: bottomSafePadding },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           {/* Header Branding */}
@@ -287,12 +298,18 @@ export const LoginScreen: React.FC = () => {
           </Animated.View>
 
           {/* Footer Note */}
-          <Text style={styles.footerNote}>
-            SiteFlow 2026 • Secure Offline-First Mobile Invoicing
-          </Text>
+          <View style={styles.loginFooterContainer}>
+            <View style={styles.loginFooterPill}>
+              <MaterialIcons name="bolt" size={13} color={COLORS.accent} />
+              <Text style={styles.loginFooterBrand}>POWERED BY DEBASHISH RAUT</Text>
+            </View>
+            <Text style={styles.footerNote}>
+              SiteFlow 2026 • Secure Offline-First Mobile Invoicing
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -462,11 +479,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
+  loginFooterContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.lg,
+  },
+  loginFooterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  loginFooterBrand: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+  },
   footerNote: {
     textAlign: 'center',
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.65)',
-    marginTop: SPACING.lg,
     fontWeight: '500',
   },
 });

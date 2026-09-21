@@ -309,6 +309,15 @@ export const SettingsScreen: React.FC = () => {
               <Text style={styles.logoutBtnText}>Log Out of SiteFlow</Text>
             </TouchableOpacity>
           </View>
+
+          {/* System & Developer Branding */}
+          <View style={styles.brandingFooter}>
+            <View style={styles.brandingPill}>
+              <MaterialIcons name="bolt" size={15} color={COLORS.accent} />
+              <Text style={styles.brandingPillText}>POWERED BY DEBASHISH RAUT</Text>
+            </View>
+            <Text style={styles.brandingVersionText}>SiteFlow Pro • Fast Contractor Billing Suite</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -488,5 +497,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.danger,
+  },
+  brandingFooter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  brandingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(124, 16, 52, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 16, 52, 0.15)',
+  },
+  brandingPillText: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: COLORS.primary,
+    letterSpacing: 0.6,
+  },
+  brandingVersionText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+    marginTop: 5,
   },
 });
