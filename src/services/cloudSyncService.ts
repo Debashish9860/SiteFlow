@@ -1,5 +1,6 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { getCurrentUser } from './authService';
 import { Bill, BusinessProfile } from '../types/bill';
 import { CompressedStorage } from './compressedStorage';
@@ -10,9 +11,41 @@ const AUTO_SYNC_ENABLED_KEY = '@siteflow_auto_sync_enabled';
 // Local network endpoints: localhost for Web/Simulator, LAN IP for physical device
 export const SERVER_ENDPOINT_KEY = '@siteflow_server_endpoint';
 const LOCALHOST_ENDPOINT = 'http://localhost:5050';
-const DEFAULT_LAN_ENDPOINT = 'http://10.13.28.162:5050';
+const DEFAULT_LAN_ENDPOINT = 'http://10.13.28.123:5050';
+const FALLBACK_LAN_ENDPOINT = 'http://10.13.28.162:5050';
+const ANDROID_EMULATOR_ENDPOINT = 'http://10.0.2.2:5050';
 
 let cachedWorkingEndpoint: string | null = null;
+
+/**
+ * Dynamically extract host IP from Expo bundler or React Native scriptURL if available
+ */
+function getMetroHostEndpoint(): string | null {
+  try {
+    const hostUri =
+      Constants?.expoConfig?.hostUri ||
+      (Constants as any)?.manifest?.debuggerHost ||
+      (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
+    if (hostUri) {
+      const ip = hostUri.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        return `http://${ip}:5050`;
+      }
+    }
+  } catch {}
+
+  try {
+    const scriptURL = NativeModules?.SourceCode?.scriptURL;
+    if (scriptURL) {
+      const match = scriptURL.match(/:\/\/([^:/]+)/);
+      if (match && match[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
+        return `http://${match[1]}:5050`;
+      }
+    }
+  } catch {}
+
+  return null;
+}
 
 /**
  * Get current configured sync server endpoint
@@ -22,6 +55,8 @@ export async function getServerEndpoint(): Promise<string> {
     const saved = await AsyncStorage.getItem(SERVER_ENDPOINT_KEY);
     if (saved && saved.trim()) return saved.trim();
   } catch {}
+  const metroHost = getMetroHostEndpoint();
+  if (metroHost) return metroHost;
   return Platform.OS === 'web' ? LOCALHOST_ENDPOINT : DEFAULT_LAN_ENDPOINT;
 }
 
@@ -41,13 +76,21 @@ async function getApiEndpoint(): Promise<string> {
   if (cachedWorkingEndpoint) return cachedWorkingEndpoint;
 
   const customEndpoint = await getServerEndpoint();
-  const candidates = [customEndpoint, DEFAULT_LAN_ENDPOINT, LOCALHOST_ENDPOINT];
+  const metroEndpoint = getMetroHostEndpoint();
+  const candidates = [
+    customEndpoint,
+    metroEndpoint,
+    DEFAULT_LAN_ENDPOINT,
+    FALLBACK_LAN_ENDPOINT,
+    ANDROID_EMULATOR_ENDPOINT,
+    LOCALHOST_ENDPOINT,
+  ].filter(Boolean) as string[];
   const uniqueCandidates = Array.from(new Set(candidates));
 
   for (const url of uniqueCandidates) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(`${url}/api/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
@@ -92,25 +135,33 @@ export async function checkCloudConnection(): Promise<CloudStatusResult> {
         dbName: data.dbName,
       };
     } else {
+      cachedWorkingEndpoint = null;
       return { connected: false, error: `Server returned HTTP ${res.status}` };
     }
   } catch (err: any) {
+    cachedWorkingEndpoint = null;
     return { connected: false, error: formatNetworkError(err, cachedWorkingEndpoint || 'Server') };
   }
 }
 
 function formatNetworkError(err: any, endpoint: string): string {
   const msg = String(err?.message || '');
-  if (msg.includes('CLEARTEXT') || msg.includes('network security policy')) {
+  const lower = msg.toLowerCase();
+  if (lower.includes('cleartext') || lower.includes('network security policy')) {
     return 'Network security policy blocked HTTP. Please install the updated APK with cleartext enabled.';
   }
   if (
-    msg.includes('Network request failed') ||
-    msg.includes('Failed to fetch') ||
-    msg.includes('Aborted') ||
-    msg.includes('timeout')
+    lower.includes('failed to fetch') ||
+    lower.includes('fetch failed') ||
+    lower.includes('network request failed') ||
+    lower.includes('networkerror') ||
+    lower.includes('aborted') ||
+    lower.includes('timeout') ||
+    lower.includes('econnrefused') ||
+    lower.includes('econnreset') ||
+    lower.includes('enotfound')
   ) {
-    return `Cannot connect to sync server (${endpoint}). Please ensure both devices are connected to the same Wi-Fi/Hotspot network.`;
+    return `Cannot reach sync server (${endpoint}). Please make sure the sync server is running and devices are on the same Wi-Fi/network.`;
   }
   return msg || 'Failed to communicate with sync server.';
 }
@@ -193,6 +244,7 @@ export async function pullAndSyncTeamBills(): Promise<{
   } catch (err: any) {
     console.warn('[PullAndSync Error]', err);
     const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
+    cachedWorkingEndpoint = null;
     return {
       success: false,
       billsCount: 0,
@@ -251,6 +303,7 @@ export async function syncAllToCloud(): Promise<{
   } catch (err: any) {
     console.warn('[CloudSync Error]', err);
     const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
+    cachedWorkingEndpoint = null;
     return {
       success: false,
       syncedCount: 0,
@@ -302,6 +355,7 @@ export async function restoreAllFromCloud(): Promise<{
   } catch (err: any) {
     console.error('[CloudRestore Error]', err);
     const endpoint = cachedWorkingEndpoint || DEFAULT_LAN_ENDPOINT;
+    cachedWorkingEndpoint = null;
     return {
       success: false,
       billsRestored: 0,

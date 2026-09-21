@@ -10,7 +10,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
-import { PRESET_CATALOG, STANDARD_UNITS, COMMON_SUB_DESCRIPTIONS } from '../data/presets';
+import {
+  PRESET_CATALOG,
+  STANDARD_UNITS,
+  UNIT_DISPLAY_LABELS,
+  COMMON_SUB_DESCRIPTIONS,
+} from '../data/presets';
 import { BillItem, ItemCategory, PresetCatalogItem } from '../types/bill';
 import { MaterialIcons } from '@expo/vector-icons';
 import { formatCurrency } from '../utils/formatters';
@@ -42,6 +47,17 @@ export const ItemQuickPickerModal: React.FC<ItemQuickPickerModalProps> = ({
     return PRESET_CATALOG.filter((item) => {
       const matchCat =
         activeCategory === 'all' ||
+        (activeCategory === 'pipes' &&
+          (item.name.toLowerCase().includes('pipe') ||
+            item.name.toLowerCase().includes('piping') ||
+            item.defaultUnit === 'Rft' ||
+            item.defaultUnit === 'Mtr' ||
+            item.defaultUnit === 'ft')) ||
+        (activeCategory === 'fittings' &&
+          item.category === 'plumbing' &&
+          !item.name.toLowerCase().includes('pipe') &&
+          item.defaultUnit !== 'Rft' &&
+          item.defaultUnit !== 'Mtr') ||
         (activeCategory === 'plumbing' && item.category === 'plumbing') ||
         (activeCategory === 'material' && (item.category === 'material' || item.category === 'civil')) ||
         (activeCategory === 'labor' && item.category === 'labor');
@@ -64,10 +80,33 @@ export const ItemQuickPickerModal: React.FC<ItemQuickPickerModalProps> = ({
   };
 
   const handleCreateCustom = () => {
-    setSelectedItemName(searchQuery.trim() || '');
-    setSubDescription('Material supply');
-    setSelectedCategory('other');
-    setUnit('pcs');
+    const trimmed = searchQuery.trim() || '';
+    const lower = trimmed.toLowerCase();
+    let detectedUnit = 'pcs';
+    if (lower.includes('inch') || lower.includes('inches')) {
+      detectedUnit = 'inch';
+    } else if (lower.includes('meter') || lower.includes('mtr')) {
+      detectedUnit = 'Mtr';
+    } else if (lower.includes('feet') || lower.includes('foot')) {
+      detectedUnit = 'ft';
+    } else if (
+      lower.includes('pipe') ||
+      lower.includes('piping') ||
+      lower.includes('rft') ||
+      lower.includes('running') ||
+      lower.includes('drainage') ||
+      lower.includes('cpvc') ||
+      lower.includes('pvc') ||
+      lower.includes('upvc') ||
+      lower.includes('gi pipe')
+    ) {
+      detectedUnit = 'Rft';
+    }
+
+    setSelectedItemName(trimmed);
+    setSubDescription(detectedUnit === 'Rft' || detectedUnit === 'Mtr' || detectedUnit === 'ft' || detectedUnit === 'inch' ? 'Material supply' : 'Material supply');
+    setSelectedCategory(lower.includes('labor') || lower.includes('labour') ? 'labor' : 'plumbing');
+    setUnit(detectedUnit);
     setRate('');
     setQuantity('1');
     setIsConfiguring(true);
@@ -237,7 +276,7 @@ export const ItemQuickPickerModal: React.FC<ItemQuickPickerModalProps> = ({
                         unit === u && styles.activeUnitText,
                       ]}
                     >
-                      {u}
+                      {UNIT_DISPLAY_LABELS[u] || u}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -280,7 +319,7 @@ export const ItemQuickPickerModal: React.FC<ItemQuickPickerModalProps> = ({
                 <MaterialIcons name="search" size={22} color={COLORS.textMuted} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search particular e.g. Elbow, Pipe, Tank..."
+                  placeholder="Search particular e.g. Pipe, Elbow, Tank..."
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
@@ -311,31 +350,38 @@ export const ItemQuickPickerModal: React.FC<ItemQuickPickerModalProps> = ({
               )}
 
               {/* Category Filter Tabs */}
-              <View style={styles.categoryTabs}>
-                {[
-                  { key: 'all', label: 'All Items' },
-                  { key: 'plumbing', label: 'Plumbing' },
-                  { key: 'labor', label: 'Labor' },
-                  { key: 'material', label: 'Civil Works' },
-                ].map((cat) => (
-                  <TouchableOpacity
-                    key={cat.key}
-                    onPress={() => setActiveCategory(cat.key)}
-                    style={[
-                      styles.categoryTab,
-                      activeCategory === cat.key && styles.activeCategoryTab,
-                    ]}
-                  >
-                    <Text
+              <View style={styles.categoryTabsContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryTabsContent}
+                >
+                  {[
+                    { key: 'all', label: 'All Items' },
+                    { key: 'pipes', label: '🚰 Pipes (Rft/Mtr)' },
+                    { key: 'fittings', label: '🔩 Fittings (pcs)' },
+                    { key: 'labor', label: '👷 Labor Charges' },
+                    { key: 'material', label: '🧱 Civil Works' },
+                  ].map((cat) => (
+                    <TouchableOpacity
+                      key={cat.key}
+                      onPress={() => setActiveCategory(cat.key)}
                       style={[
-                        styles.categoryTabText,
-                        activeCategory === cat.key && styles.activeCategoryTabText,
+                        styles.categoryTab,
+                        activeCategory === cat.key && styles.activeCategoryTab,
                       ]}
                     >
-                      {cat.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          styles.categoryTabText,
+                          activeCategory === cat.key && styles.activeCategoryTabText,
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
 
               {/* Presets List */}
@@ -613,10 +659,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
   },
-  categoryTabs: {
+  categoryTabsContainer: {
+    marginBottom: 10,
+  },
+  categoryTabsContent: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 10,
+    paddingRight: 10,
   },
   categoryTab: {
     paddingHorizontal: 12,

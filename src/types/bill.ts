@@ -7,7 +7,7 @@ export interface BillItem {
   subDescription?: string; // e.g. 'Labour charges', 'Fitting charges', etc.
   category: ItemCategory;
   quantity: number;
-  unit: string; // 'pcs', 'bags', 'ft', 'days', 'pts', 'sq.ft', 'brass', 'lump-sum'
+  unit: string; // 'Rft', 'Mtr', 'ft', 'pcs', 'nos', 'days', 'pts', 'sq.ft', 'lump-sum', 'bags', 'brass', etc.
   rate: number;
   amount: number;
 }

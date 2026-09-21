@@ -29,14 +29,18 @@ import {
   ContractorPreset,
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
-import { STANDARD_UNITS } from '../data/presets';
+import { STANDARD_UNITS, UNIT_DISPLAY_LABELS } from '../data/presets';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 const POPULAR_PARTICULARS = [
+  { name: '1" CPVC Pipe', unit: 'Rft', rate: 70 },
+  { name: '3/4" CPVC Pipe', unit: 'Rft', rate: 45 },
+  { name: '4" PVC Drainage Pipe', unit: 'Rft', rate: 85 },
+  { name: 'PPR Water Pipe', unit: 'Mtr', rate: 90 },
   { name: '1" Elbow', unit: 'pcs', rate: 100 },
   { name: '3/4" Elbow', unit: 'pcs', rate: 45 },
-  { name: '1" CPVC Pipe', unit: 'ft', rate: 70 },
+  { name: '1" Tee', unit: 'pcs', rate: 120 },
   { name: 'Tank Fitting Work', unit: 'lump-sum', rate: 5000 },
   { name: 'Plumber Daily Labor', unit: 'days', rate: 850 },
 ];
@@ -287,6 +291,32 @@ export const CreateBillScreen: React.FC = () => {
     setParticularQty('1');
     setParticularRate('');
     setParticularUnit('pcs');
+  };
+
+  const handleParticularNameChange = (text: string) => {
+    setParticularName(text);
+    const lower = text.toLowerCase();
+    if (particularUnit === 'pcs' || !particularUnit || particularUnit === 'ft') {
+      if (lower.includes('inch') || lower.includes('inches')) {
+        setParticularUnit('inch');
+      } else if (lower.includes('meter') || lower.includes('mtr')) {
+        setParticularUnit('Mtr');
+      } else if (lower.includes('feet') || lower.includes('foot')) {
+        setParticularUnit('ft');
+      } else if (
+        lower.includes('pipe') ||
+        lower.includes('piping') ||
+        lower.includes('rft') ||
+        lower.includes('running') ||
+        lower.includes('drainage') ||
+        lower.includes('cpvc') ||
+        lower.includes('pvc') ||
+        lower.includes('upvc') ||
+        lower.includes('gi pipe')
+      ) {
+        setParticularUnit('Rft');
+      }
+    }
   };
 
   const handleSelectPopular = (item: { name: string; unit: string; rate: number }) => {
@@ -657,7 +687,7 @@ export const CreateBillScreen: React.FC = () => {
                   style={styles.textInput}
                   placeholder="e.g. 1&quot; Elbow, CPVC Pipe, Tank Fitting"
                   value={particularName}
-                  onChangeText={setParticularName}
+                  onChangeText={handleParticularNameChange}
                 />
               </View>
 
@@ -721,6 +751,36 @@ export const CreateBillScreen: React.FC = () => {
                     onChangeText={setParticularUnit}
                   />
                 </View>
+              </View>
+
+              {/* Quick Unit Selector Chips */}
+              <View style={styles.unitSelectorRow}>
+                <Text style={styles.unitSelectorLabel}>Unit:</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.unitSelectorScroll}
+                >
+                  {STANDARD_UNITS.map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      onPress={() => setParticularUnit(u)}
+                      style={[
+                        styles.quickUnitChip,
+                        particularUnit === u && styles.quickUnitChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickUnitChipText,
+                          particularUnit === u && styles.quickUnitChipTextActive,
+                        ]}
+                      >
+                        {UNIT_DISPLAY_LABELS[u] || u}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
 
               {/* Dynamic Animated Total Box: e.g. 100 qty x 100 rate = 10,000/- */}
@@ -1212,6 +1272,43 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  unitSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  unitSelectorLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  unitSelectorScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingRight: 10,
+  },
+  quickUnitChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  quickUnitChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  quickUnitChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  quickUnitChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   calcFormulaBox: {
     backgroundColor: '#FFFDF5',
