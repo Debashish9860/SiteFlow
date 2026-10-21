@@ -22,7 +22,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrl": ""
+      "apiUrl": "https://site-flow-five.vercel.app"
     },
     "plugins": [
       "expo-sharing",
