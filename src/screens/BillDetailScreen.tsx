@@ -99,9 +99,14 @@ export const BillDetailScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (bill) {
+            if (!bill) return;
+            try {
               await deleteBill(bill.id);
               navigation.navigate('Home');
+            } catch (error: any) {
+              // Without this the rejection is swallowed and the screen simply
+              // sits there, looking as though Delete did nothing.
+              Alert.alert('Delete Failed', error?.message || 'Could not delete this record.');
             }
           },
         },

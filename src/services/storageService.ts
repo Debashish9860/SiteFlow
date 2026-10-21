@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bill, BusinessProfile, PaymentRecord } from '../types/bill';
 import { triggerBackgroundCloudSync, recordBillDeletion, deleteBillInCloud } from './cloudSyncService';
 import { CompressedStorage } from './compressedStorage';
+import { computePaymentUpdate } from '../utils/billMath';
 
 const BILLS_KEY = '@billmaker_bills';
 const PROFILE_KEY = '@billmaker_profile';
@@ -32,6 +33,15 @@ export async function getBills(): Promise<Bill[]> {
         billedByPhone: b.billedByPhone || '+91 9860980626',
         billedByAddress: b.billedByAddress || 'Sus, Pune - 411021',
         paymentRecords: b.paymentRecords || [],
+        items: Array.isArray(b.items) ? b.items : [],
+        // Totals are summed straight out of these. A bill arriving from
+        // another device without one turns an entire dashboard figure into
+        // NaN, which formatCurrency then quietly renders as a confident zero.
+        subtotal: Number(b.subtotal) || 0,
+        discount: Number(b.discount) || 0,
+        advancePaid: Number(b.advancePaid) || 0,
+        balanceDue: Number(b.balanceDue) || 0,
+        createdAt: Number(b.createdAt) || 0,
       }))
       .sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
@@ -79,26 +89,23 @@ export async function registerBillPayment(
     }
 
     const bill = bills[billIndex];
-    const netTotal = Math.max(0, bill.subtotal - (bill.discount || 0));
-    const currentPaid = bill.advancePaid || 0;
-    const newTotalPaid = Math.min(netTotal, currentPaid + amountReceived);
-
     const taxAmount = options?.taxDeducted || 0;
-    let newBalanceDue = Math.max(0, netTotal - (newTotalPaid + taxAmount));
-    if (options?.markAsSettled) {
-      newBalanceDue = 0;
-    }
-
-    const totalTaxDeducted = (bill.taxDeducted || 0) + taxAmount;
+    const outcome = computePaymentUpdate(bill, {
+      amountReceived,
+      taxDeduction: taxAmount,
+      markAsSettled: options?.markAsSettled,
+    });
 
     const newRecord: PaymentRecord = {
-      id: `pay_${Date.now()}`,
+      // A bare timestamp collides for two payments taken in the same
+      // millisecond, and across two phones recording at once.
+      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       amount: amountReceived,
       date: new Date().toISOString().split('T')[0],
       mode: mode,
       note: note ? note.trim() : undefined,
       taxDeduction: taxAmount > 0 ? taxAmount : undefined,
-      isSettlement: Boolean(options?.markAsSettled || newBalanceDue === 0),
+      isSettlement: outcome.isSettled,
       receivedAt: Date.now(),
     };
 
@@ -106,10 +113,10 @@ export async function registerBillPayment(
 
     const updatedBill: Bill = {
       ...bill,
-      advancePaid: newTotalPaid,
-      balanceDue: newBalanceDue,
-      taxDeducted: totalTaxDeducted > 0 ? totalTaxDeducted : undefined,
-      isSettled: Boolean(options?.markAsSettled || newBalanceDue === 0),
+      advancePaid: outcome.totalPaid,
+      balanceDue: outcome.balanceDue,
+      taxDeducted: outcome.taxDeducted > 0 ? outcome.taxDeducted : undefined,
+      isSettled: outcome.isSettled,
       settlementReason: options?.settlementReason || bill.settlementReason,
       paymentRecords: updatedRecords,
       updatedAt: Date.now(),
@@ -168,9 +175,10 @@ export async function deleteBill(billId: string): Promise<void> {
     await recordBillDeletion(billId);
     await CompressedStorage.setItem(BILLS_KEY, updated);
 
-    // Tell the cloud right away when reachable; the tombstone above is what makes
-    // the deletion stick if this fails (offline, wrong LAN).
-    await deleteBillInCloud(billId);
+    // Tell the cloud when it is reachable, but do not hold the user on a
+    // network round trip to watch the bill disappear: the tombstone above is
+    // what makes the deletion stick, and it is replayed on the next sync.
+    void deleteBillInCloud(billId);
 
     triggerBackgroundCloudSync();
   } catch (error) {

@@ -203,16 +203,15 @@ export const HomeScreen: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'invoice' | 'quotation'>('all');
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<Bill | null>(null);
   const [syncingCloud, setSyncingCloud] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
   const [syncCount, setSyncCount] = useState<number | undefined>(undefined);
 
   const handleQuickCloudSync = async () => {
     setSyncingCloud(true);
     try {
-      const res = await pullAndSyncTeamBills();
+      const res = await syncAndReload();
       if (res.success) {
-        const refreshed = await getBills();
-        setBills(refreshed);
         setSyncCount(res.billsCount);
         setShowSyncSuccess(true);
       } else {
@@ -274,34 +273,62 @@ export const HomeScreen: React.FC = () => {
     ]).start();
   }, []);
 
+  /** Show what is already on this phone. Fast, and never touches the network. */
+  const loadLocalData = async () => {
+    const [loadedBills, loadedProfile, loadedPresets] = await Promise.all([
+      getBills(),
+      getBusinessProfile(),
+      getContractorPresets(),
+    ]);
+    setBills(loadedBills);
+    setProfile(loadedProfile);
+    if (loadedPresets && loadedPresets.length > 0) {
+      setPresets(loadedPresets);
+    }
+  };
+
+  /** Pull from the cloud, then show whatever the merge left on this phone. */
+  const syncAndReload = async () => {
+    const res = await pullAndSyncTeamBills();
+    if (res.success) await loadLocalData();
+    return res;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Instant local load from compressed storage
-      const [loadedBills, loadedProfile, loadedPresets] = await Promise.all([
-        getBills(),
-        getBusinessProfile(),
-        getContractorPresets(),
-      ]);
-      setBills(loadedBills);
-      setProfile(loadedProfile);
-      if (loadedPresets && loadedPresets.length > 0) {
-        setPresets(loadedPresets);
-      }
-
-      // 2. Background cross-device sync: fetch bills created by brother on another phone
-      pullAndSyncTeamBills()
-        .then(async (res) => {
-          if (res.success) {
-            const updated = await getBills();
-            setBills(updated);
-          }
-        })
-        .catch(() => {});
+      await loadLocalData();
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
       setLoading(false);
+    }
+    // Local data is already on screen, so a slow server delays only the other
+    // phone's changes showing up, not the first paint.
+    syncAndReload().catch(() => {});
+  };
+
+  /**
+   * Pull to refresh.
+   *
+   * The spinner has to stay up until the server has actually answered. Ending
+   * it as soon as the local read finished made every pull look like it did
+   * nothing at all, because nothing local had changed yet - the sync was still
+   * in flight, unwatched, and its result was discarded if it failed. For the
+   * same reason a failure is now reported instead of swallowed.
+   */
+  const handlePullToRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadLocalData();
+      const res = await syncAndReload();
+      if (!res.success) {
+        Alert.alert('Cloud Sync Notice', res.message);
+      }
+    } catch (e: any) {
+      Alert.alert('Sync Error', e?.message || 'Could not sync to cloud.');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -430,7 +457,11 @@ export const HomeScreen: React.FC = () => {
           data={filteredBills}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={loadData} colors={[COLORS.primary]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handlePullToRefresh}
+              colors={[COLORS.primary]}
+            />
           }
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={

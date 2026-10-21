@@ -79,6 +79,15 @@ export const CreateBillScreen: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [billNumber, setBillNumber] = useState('');
   const [editingCreatedAt, setEditingCreatedAt] = useState<number | null>(null);
+  /**
+   * The bill being edited, kept whole.
+   *
+   * This form owns only part of a bill. Payments, settlement state and tax
+   * withheld are all written by the payment screen, and saving a freshly built
+   * object over the stored record silently discarded every one of them: edit a
+   * bill after receiving money and the money was gone.
+   */
+  const [editingOriginal, setEditingOriginal] = useState<Bill | null>(null);
 
   // Particular Entry State (Inline fast entry)
   const [particularName, setParticularName] = useState('');
@@ -139,6 +148,7 @@ export const CreateBillScreen: React.FC = () => {
         setAdvancePaid(existing.advancePaid ? existing.advancePaid.toString() : '');
         setNotes(existing.notes || '');
         setEditingCreatedAt(existing.createdAt || Date.now());
+        setEditingOriginal(existing);
 
         if (existing.billedBy?.toLowerCase().includes('ramesh')) {
           setSelectedIssuerId('ramesh');
@@ -334,7 +344,13 @@ export const CreateBillScreen: React.FC = () => {
   const discountNum = parseFloat(discount) || 0;
   const advanceNum = parseFloat(advancePaid) || 0;
   const grandTotal = Math.max(0, subtotal - discountNum);
-  const balanceDue = Math.max(0, grandTotal - advanceNum);
+  // Tax the client withheld, and a manual settlement, both come from the
+  // payment screen. Recomputing the balance without them reopened bills that
+  // had already been closed.
+  const retainedTax = editingOriginal?.taxDeducted || 0;
+  const balanceDue = editingOriginal?.isSettled
+    ? 0
+    : Math.max(0, grandTotal - advanceNum - retainedTax);
   const inWords = numberToWordsIndian(grandTotal);
 
   const handleSaveAndGenerate = async () => {
@@ -367,14 +383,21 @@ export const CreateBillScreen: React.FC = () => {
     setIsSaving(true);
     try {
       const newBill: Bill = {
-        id: editBillId || Date.now().toString(),
+        // Carry over every field this form does not edit - payment history,
+        // settlement, tax withheld, customer phone - instead of dropping them.
+        ...(editingOriginal || {}),
+        // A bare timestamp collides when two phones create a bill in the same
+        // millisecond, and the loser is overwritten on the next sync.
+        id: editBillId || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         billNumber: billNumber.trim() || (billType === 'quotation' ? 'QT-' + Date.now().toString().slice(-4) : '—'),
         billType: billType,
         billedBy: billedByName.trim(),
         billedByTitle: billedByTitle.trim(),
         billedByPhone: billedByPhone.trim(),
         billedByAddress: billedByAddress.trim(),
-        date: getTodayDateString(),
+        // Editing must not re-date the document: an invoice issued in March
+        // stays a March invoice however often it is corrected.
+        date: editingOriginal?.date || getTodayDateString(),
         customerName: customerName.trim(),
         siteLocation: siteLocation.trim() || undefined,
         siteCity: siteCity.trim() || undefined,

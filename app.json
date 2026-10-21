@@ -2,7 +2,7 @@
   "expo": {
     "name": "SiteFlow",
     "slug": "siteflow",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.debashish.siteflow",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png"

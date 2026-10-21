@@ -186,6 +186,31 @@ export async function migrateStaleLanEndpoint(): Promise<void> {
 
 let cachedWorkingEndpoint: string | null = null;
 
+/**
+ * How long any single sync request may take.
+ *
+ * These calls had no deadline at all, so a connection that stalled left the
+ * sync spinner turning until the app was killed. Generous enough to cover a
+ * serverless cold start plus the database connecting behind it, bounded so the
+ * screen always comes back.
+ */
+const SYNC_TIMEOUT_MS = 45000;
+
+/** fetch with a deadline attached. */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = SYNC_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /** One health probe against `url`, with its own deadline. */
 async function probeHealth(url: string, timeoutMs: number): Promise<boolean> {
   const controller = new AbortController();
@@ -327,6 +352,14 @@ async function getApiEndpoint(): Promise<string> {
 
   const candidates = [savedEndpoint, CONFIGURED_API_URL, ...lanCandidates].filter(Boolean) as string[];
   const uniqueCandidates = Array.from(new Set(candidates));
+
+  // Probing exists to choose between candidates. With only one there is
+  // nothing to choose, and probing it first merely pays for an extra round
+  // trip - and, against a sleeping serverless function, an extra cold start
+  // that the 8s probe below usually loses. That is what made the first sync
+  // after an idle spell take the better part of a minute and often fail,
+  // while a restart appeared to fix it. Let the real request do the work.
+  if (uniqueCandidates.length === 1) return uniqueCandidates[0];
 
   for (const url of uniqueCandidates) {
     const isConfigured = url === savedEndpoint || url === CONFIGURED_API_URL;
@@ -470,7 +503,7 @@ export async function pullAndSyncTeamBills(): Promise<{
     const pendingDeletes = await getDeletedBillIds();
 
     // 1. Try bidirectional merge endpoint
-    const res = await fetch(`${endpoint}/api/sync/merge`, {
+    const res = await fetchWithTimeout(`${endpoint}/api/sync/merge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -566,7 +599,7 @@ export async function syncAllToCloud(): Promise<{
       syncedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(`${endpoint}/api/sync/backup`, {
+    const res = await fetchWithTimeout(`${endpoint}/api/sync/backup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -616,7 +649,9 @@ export async function restoreAllFromCloud(): Promise<{
     const user = await getCurrentUser();
     const userEmail = user?.email || 'default';
 
-    const res = await fetch(`${endpoint}/api/sync/restore?userEmail=${encodeURIComponent(userEmail)}`);
+    const res = await fetchWithTimeout(
+      `${endpoint}/api/sync/restore?userEmail=${encodeURIComponent(userEmail)}`
+    );
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
