@@ -110,7 +110,7 @@ async function recordDeletions(database, ids, userEmail) {
 
 /** Set of every bill id that has been deleted. */
 /**
- * Store a bill unless the copy already in Atlas is newer.
+ * Store a batch of bills, skipping any whose copy in Atlas is already newer.
  *
  * Devices upload everything they hold, including copies untouched since another
  * phone edited the same bill. Upserting those unconditionally lets the stale
@@ -122,21 +122,55 @@ async function recordDeletions(database, ids, userEmail) {
  * stamped copy, which is the right direction: only the newer app stamps, and
  * only it can have made the edit.
  *
+ * Costs one read and one write for the whole batch rather than two round trips
+ * per bill. Doing it per bill was fine at a handful of them, but every sync
+ * sends the device's entire collection, so the time grew with the business and
+ * would eventually have run into the serverless execution limit.
+ *
  * Two devices writing the same bill in the same instant can still interleave
- * between the read and the write. For a handful of devices sharing a few bills
+ * between the read and the write. For a few devices sharing one book of bills
  * that is not worth a transaction, and it replaces a clobber that was certain.
  */
-async function upsertBillIfNewer(billsCol, bill, userEmail) {
-  const incomingStamp = Number(bill.updatedAt) || 0;
-  const stored = await billsCol.findOne({ _id: bill.id }, { projection: { updatedAt: 1 } });
-  if (stored && (Number(stored.updatedAt) || 0) > incomingStamp) return false;
+async function upsertBillsIfNewer(billsCol, bills, userEmail, tombstoned) {
+  // One entry per id: a device can send the same bill twice, so keep the later.
+  const best = new Map();
+  for (const bill of bills) {
+    if (!bill || !bill.id) continue;
+    if (tombstoned.has(bill.id)) continue;
+    const prior = best.get(bill.id);
+    if (!prior || (Number(bill.updatedAt) || 0) >= (Number(prior.updatedAt) || 0)) {
+      best.set(bill.id, bill);
+    }
+  }
+  if (best.size === 0) return 0;
 
-  await billsCol.updateOne(
-    { _id: bill.id },
-    { $set: { ...bill, _id: bill.id, lastSyncedBy: userEmail, syncedAt: new Date() } },
-    { upsert: true }
-  );
-  return true;
+  const storedRows = await billsCol
+    .find({ _id: { $in: Array.from(best.keys()) } }, { projection: { updatedAt: 1 } })
+    .toArray();
+  const storedStamps = new Map(storedRows.map(r => [r._id, Number(r.updatedAt) || 0]));
+
+  const syncedAt = new Date();
+  const operations = [];
+  for (const [id, bill] of best) {
+    const stored = storedStamps.get(id);
+    if (stored !== undefined && stored > (Number(bill.updatedAt) || 0)) continue;
+
+    // `_id` is set by the filter, and on an upsert it comes from there too, so
+    // it never appears in the update and can never be written as a field.
+    const { _id, ...fields } = bill;
+    operations.push({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { ...fields, id, lastSyncedBy: userEmail, syncedAt } },
+        upsert: true,
+      },
+    });
+  }
+  if (operations.length === 0) return 0;
+
+  // Unordered: one rejected bill must not stop the rest of the batch.
+  await billsCol.bulkWrite(operations, { ordered: false });
+  return operations.length;
 }
 
 async function getDeletedIds(database) {
@@ -234,11 +268,7 @@ app.post('/api/sync/backup', async (req, res) => {
 
     // 1. Upsert each bill into the shared company database
     if (Array.isArray(bills) && bills.length > 0) {
-      for (const bill of bills) {
-        if (!bill.id) continue;
-        if (tombstoned.has(bill.id)) continue;
-        if (await upsertBillIfNewer(billsCol, bill, userEmail)) upsertedBills++;
-      }
+      upsertedBills = await upsertBillsIfNewer(billsCol, bills, userEmail, tombstoned);
     }
 
     // 2. Upsert profile
@@ -314,11 +344,7 @@ app.post('/api/sync/merge', async (req, res) => {
 
     // 2. Upsert local bills into Atlas, skipping anything already deleted.
     if (Array.isArray(localBills) && localBills.length > 0) {
-      for (const bill of localBills) {
-        if (!bill.id) continue;
-        if (tombstoned.has(bill.id)) continue;
-        await upsertBillIfNewer(billsCol, bill, userEmail);
-      }
+      await upsertBillsIfNewer(billsCol, localBills, userEmail, tombstoned);
     }
 
     // 3. Fetch all shared bills from Atlas

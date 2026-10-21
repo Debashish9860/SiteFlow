@@ -148,6 +148,42 @@ export async function hasConfiguredServer(): Promise<boolean> {
  */
 const WAKE_TIMEOUT_MS = 60000;
 
+const ENDPOINT_MIGRATION_KEY = '@siteflow_endpoint_migrated_v1';
+
+/** True for an address that can only resolve on a local network. */
+function isLanAddress(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/i.test(
+    url
+  );
+}
+
+/**
+ * Drop a saved LAN address once, on builds that ship a public one.
+ *
+ * Earlier builds pre-filled Settings with the development machine's LAN IP, so
+ * any phone where Test & Save was tapped during testing has that address
+ * stored. A stored address deliberately outranks the one baked into the build,
+ * and app data survives reinstalling the APK, so without this the phone would
+ * go on dialling an unreachable laptop no matter how many times it is updated.
+ *
+ * Runs once ever: a LAN address entered on purpose after this still sticks,
+ * which is what makes pointing a phone at a laptop still possible.
+ */
+export async function migrateStaleLanEndpoint(): Promise<void> {
+  if (!CONFIGURED_API_URL) return;
+  try {
+    if (await AsyncStorage.getItem(ENDPOINT_MIGRATION_KEY)) return;
+    const saved = (await AsyncStorage.getItem(SERVER_ENDPOINT_KEY))?.trim();
+    if (saved && isLanAddress(saved)) {
+      await AsyncStorage.removeItem(SERVER_ENDPOINT_KEY);
+      cachedWorkingEndpoint = null;
+    }
+    await AsyncStorage.setItem(ENDPOINT_MIGRATION_KEY, '1');
+  } catch {
+    // Not worth failing startup over: Settings can still correct the address.
+  }
+}
+
 let cachedWorkingEndpoint: string | null = null;
 
 /** One health probe against `url`, with its own deadline. */
@@ -378,8 +414,7 @@ function formatNetworkError(err: any, endpoint: string): string {
     // Distinguish "never told where the server is" from "server is down".
     // Blaming Wi-Fi is wrong and unactionable when no address is set at all.
     if (!endpoint) return NOT_CONFIGURED_MESSAGE;
-    const isLan = /^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.)/i.test(endpoint);
-    if (isLan) {
+    if (isLanAddress(endpoint)) {
       return `Cannot reach sync server (${endpoint}). This is a local-network address, so it only works on the same Wi-Fi as the computer running the server.`;
     }
     return `Cannot reach sync server (${endpoint}). Check your internet connection, then try again. If the server was asleep it may need up to a minute to wake.`;

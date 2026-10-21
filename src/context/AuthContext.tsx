@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { migrateStaleLanEndpoint } from '../services/cloudSyncService';
 import {
   User,
   getCurrentUser,
@@ -28,6 +29,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Before anything asks where the server is, retire an address left
+        // behind by a build that guessed at one.
+        await migrateStaleLanEndpoint();
         const activeUser = await getCurrentUser();
         setUser(activeUser);
       } catch (error) {
