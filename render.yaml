@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: siteflow-sync
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      # Set these in the Render dashboard - never commit real values.
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: siteflow_db
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false

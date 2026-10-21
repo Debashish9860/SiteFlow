@@ -329,12 +329,14 @@ export const HomeScreen: React.FC = () => {
     : null;
 
   const displayContractorName =
-    currentPreset?.name ||
-    (isRajeeb
-      ? 'RAJEEB RAUT'
-      : isRamesh
-      ? 'RAMESH RAUT'
-      : (user?.name ? user.name.toUpperCase() : (profile?.ownerName?.toUpperCase() || 'RAMESH RAUT')));
+    user?.name
+      ? user.name.toUpperCase()
+      : currentPreset?.name ||
+        (isRajeeb
+          ? 'RAJEEB RAUT'
+          : isRamesh
+          ? 'RAMESH RAUT'
+          : (profile?.ownerName?.toUpperCase() || 'CONTRACTOR'));
 
   const displayContractorTitle =
     currentPreset?.title ||

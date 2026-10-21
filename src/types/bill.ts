@@ -47,6 +47,11 @@ export interface Bill {
   notes?: string;
   paymentRecords?: PaymentRecord[];
   createdAt: number;
+  /**
+   * When this bill was last written, on whichever device wrote it. Sync compares
+   * it to decide which copy survives, so every local mutation refreshes it.
+   */
+  updatedAt?: number;
 }
 
 export interface BusinessProfile {

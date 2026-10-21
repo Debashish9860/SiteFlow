@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bill, BusinessProfile, PaymentRecord } from '../types/bill';
-import { triggerBackgroundCloudSync } from './cloudSyncService';
+import { triggerBackgroundCloudSync, recordBillDeletion, deleteBillInCloud } from './cloudSyncService';
 import { CompressedStorage } from './compressedStorage';
 
 const BILLS_KEY = '@billmaker_bills';
@@ -43,11 +43,14 @@ export async function getBills(): Promise<Bill[]> {
 export async function saveBill(newBill: Bill): Promise<void> {
   try {
     const bills = await getBills();
-    const existingIndex = bills.findIndex((b) => b.id === newBill.id);
+    // Stamped on every write: sync keeps whichever copy of a bill was edited
+    // last, and an unstamped edit is invisible to that comparison.
+    const stamped: Bill = { ...newBill, updatedAt: Date.now() };
+    const existingIndex = bills.findIndex((b) => b.id === stamped.id);
     if (existingIndex >= 0) {
-      bills[existingIndex] = newBill;
+      bills[existingIndex] = stamped;
     } else {
-      bills.unshift(newBill);
+      bills.unshift(stamped);
     }
     await CompressedStorage.setItem(BILLS_KEY, bills);
     triggerBackgroundCloudSync();
@@ -109,6 +112,7 @@ export async function registerBillPayment(
       isSettled: Boolean(options?.markAsSettled || newBalanceDue === 0),
       settlementReason: options?.settlementReason || bill.settlementReason,
       paymentRecords: updatedRecords,
+      updatedAt: Date.now(),
     };
 
     bills[billIndex] = updatedBill;
@@ -141,6 +145,7 @@ export async function updateBillPaymentStatus(
       ...bill,
       advancePaid: validatedPaid,
       balanceDue: validatedDue,
+      updatedAt: Date.now(),
     };
 
     bills[billIndex] = updatedBill;
@@ -157,7 +162,16 @@ export async function deleteBill(billId: string): Promise<void> {
   try {
     const bills = await getBills();
     const updated = bills.filter((b) => b.id !== billId);
+
+    // Record the deletion before removing it locally. The bill also exists in the
+    // shared cloud copy, so without this the next sync pulls it back.
+    await recordBillDeletion(billId);
     await CompressedStorage.setItem(BILLS_KEY, updated);
+
+    // Tell the cloud right away when reachable; the tombstone above is what makes
+    // the deletion stick if this fails (offline, wrong LAN).
+    await deleteBillInCloud(billId);
+
     triggerBackgroundCloudSync();
   } catch (error) {
     console.error('Error deleting bill:', error);

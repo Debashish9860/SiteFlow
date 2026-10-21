@@ -24,6 +24,10 @@ import {
   ContractorPreset,
   DEFAULT_CONTRACTOR_PRESETS,
 } from '../services/storageService';
+import {
+  getServerEndpoint,
+  testAndSaveServerEndpoint,
+} from '../services/cloudSyncService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
@@ -43,9 +47,27 @@ export const SettingsScreen: React.FC = () => {
   const [address, setAddress] = useState('Sus, Pune - 411021');
   const [noteFooter, setNoteFooter] = useState('Thank you for your business!');
 
+  const [serverUrl, setServerUrl] = useState('');
+  const [testingServer, setTestingServer] = useState(false);
+
   useEffect(() => {
     loadProfile();
+    getServerEndpoint()
+      .then((url) => setServerUrl(url || ''))
+      .catch(() => setServerUrl(''));
   }, []);
+
+  const handleTestServer = async () => {
+    setTestingServer(true);
+    try {
+      const result = await testAndSaveServerEndpoint(serverUrl);
+      Alert.alert(result.success ? 'Cloud Sync Connected' : 'Could Not Connect', result.message);
+    } catch (err: any) {
+      Alert.alert('Could Not Connect', err?.message || 'Unexpected error while testing the address.');
+    } finally {
+      setTestingServer(false);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -310,6 +332,50 @@ export const SettingsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Cloud Sync Server */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Cloud Sync Server</Text>
+            <View style={styles.syncStatusRow}>
+              <View
+                style={[
+                  styles.syncStatusDot,
+                  { backgroundColor: serverUrl.trim() ? COLORS.success : COLORS.textSecondary },
+                ]}
+              />
+              <Text style={styles.syncStatusText}>
+                {serverUrl.trim() ? 'Sync server set' : 'Sync not set up - this phone works on its own'}
+              </Text>
+            </View>
+            <Text style={styles.syncHelpText}>
+              Optional. Bills, PDFs and Excel exports all work without it. Add an address only
+              to share bills between phones, and use the same address on every phone.
+            </Text>
+            <CustomInput
+              label="Server Address"
+              value={serverUrl}
+              onChangeText={setServerUrl}
+              placeholder="https://your-siteflow-server.com"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <TouchableOpacity
+              onPress={handleTestServer}
+              disabled={testingServer}
+              style={[styles.testServerBtn, testingServer && styles.testServerBtnDisabled]}
+              activeOpacity={0.8}
+            >
+              {testingServer ? (
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              ) : (
+                <MaterialIcons name="cloud-done" size={18} color={COLORS.accent} />
+              )}
+              <Text style={styles.testServerBtnText}>
+                {testingServer ? 'Testing connection...' : 'Test & Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* System & Developer Branding */}
           <View style={styles.brandingFooter}>
             <View style={styles.brandingPill}>
@@ -433,6 +499,48 @@ const styles = StyleSheet.create({
   },
   saveActionWrap: {
     marginTop: 4,
+  },
+  syncHelpText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  syncStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  syncStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  syncStatusText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  testServerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    marginTop: 4,
+  },
+  testServerBtnDisabled: {
+    opacity: 0.6,
+  },
+  testServerBtnText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.accent,
   },
   accountCard: {
     backgroundColor: '#FFFFFF',
